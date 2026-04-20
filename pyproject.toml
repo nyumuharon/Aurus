@@ -1,0 +1,57 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aurus"
+version = "0.1.0"
+description = "Quantitative trading research and execution system for XAU/USD."
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+authors = [
+  { name = "Aurus Contributors" },
+]
+dependencies = [
+  "pydantic>=2.8,<3",
+]
+
+[project.scripts]
+aurus-baseline-backtest = "aurus.backtest.run_baseline:main"
+
+[project.optional-dependencies]
+dev = [
+  "mypy>=1.10",
+  "pytest>=8.2",
+  "ruff>=0.5",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["aurus"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["aurus", "tests"]
+
+[tool.ruff.lint]
+select = [
+  "E",
+  "F",
+  "I",
+  "UP",
+  "B",
+  "SIM",
+]
+
+[tool.mypy]
+python_version = "3.11"
+packages = ["aurus"]
+strict = true
+warn_unused_configs = true
+warn_return_any = true
+warn_unreachable = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra --strict-config --strict-markers"
+testpaths = ["tests"]

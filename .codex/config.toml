@@ -1,0 +1,14 @@
+profile = "build"
+
+[profiles.build]
+model = "gpt-5.4"
+approval_policy = "on-request"
+
+[profiles.review]
+model = "gpt-5.4"
+approval_policy = "never"
+sandbox_mode = "read-only"
+
+[profiles.fast]
+model = "gpt-5.4-mini"
+approval_policy = "on-request"
