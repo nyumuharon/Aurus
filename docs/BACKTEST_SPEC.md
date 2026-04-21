@@ -16,6 +16,7 @@ Event-driven backtest engine.
 ## Trade Logic
 - entry at bar close or next open
 - SL and TP enforced
+- optional stop tightening can move stops to breakeven after +0.5R and trail at +0.25R after +1.0R
 
 ## Outputs
 - trade log
