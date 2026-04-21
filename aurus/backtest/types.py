@@ -26,8 +26,16 @@ class BacktestConfig:
     default_quantity: Decimal = Decimal("1")
     spread: Decimal = Decimal("0")
     slippage: Decimal = Decimal("0")
+    entry_slippage: Decimal | None = None
+    exit_slippage: Decimal | None = None
+    spread_multiplier: Decimal = Decimal("1")
     commission_per_fill: Decimal = Decimal("0")
     account_id: str = "backtest"
+    record_events: bool = True
+    stop_tightening_enabled: bool = False
+    breakeven_trigger_r: Decimal = Decimal("0.5")
+    trailing_trigger_r: Decimal = Decimal("1.0")
+    trailing_stop_r: Decimal = Decimal("0.25")
 
 
 @dataclass(frozen=True)
@@ -81,6 +89,7 @@ class OpenPosition:
     entry_fill_id: str
     stop_loss: Decimal | None = None
     take_profit: Decimal | None = None
+    initial_risk_per_unit: Decimal | None = None
     commission: Decimal = Decimal("0")
 
 
@@ -111,4 +120,3 @@ BacktestEvent = (
     | FillEvent
     | PositionSnapshot
 )
-
