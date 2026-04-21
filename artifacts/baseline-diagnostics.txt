@@ -1,0 +1,19 @@
+Baseline diagnostic rejection funnel
+strategy calls: 2880
+execution bar calls: 2880
+insufficient execution history: 2
+candidate bars: 2878
+session filter pass: 1080
+session filter reject: 1798
+spread filter pass: 1080
+spread filter reject: 0
+volatility filter pass: 1079
+volatility filter reject: 1
+context trend filter pass: 1079
+context trend filter reject: 0
+pullback condition pass: 1079
+pullback condition reject: 0
+confirmation candle condition pass: 824
+confirmation candle condition reject: 255
+final signal emission: 824
+single biggest blocker: session_filter (1798)
