@@ -1,10 +1,12 @@
 """Tests for the deterministic event-driven backtest engine."""
 
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from aurus.backtest import BacktestConfig, BacktestEngine
 from aurus.common.schemas import BarEvent, EventKind, Side, SignalEvent, domain_from_json
+from pydantic import JsonValue
 
 
 def bar(index: int, *, close: str, high: str | None = None, low: str | None = None) -> BarEvent:
@@ -22,7 +24,7 @@ def bar(index: int, *, close: str, high: str | None = None, low: str | None = No
     )
 
 
-def buy_signal(source_bar: BarEvent, **features: object) -> SignalEvent:
+def buy_signal(source_bar: BarEvent, **features: JsonValue) -> SignalEvent:
     return SignalEvent(
         timestamp=source_bar.timestamp,
         correlation_id=f"signal-{source_bar.correlation_id}",
@@ -31,14 +33,14 @@ def buy_signal(source_bar: BarEvent, **features: object) -> SignalEvent:
         instrument=source_bar.instrument,
         side=Side.BUY,
         strength=Decimal("1"),
-        features=features,
+        features=dict(features),
     )
 
 
 def test_replays_bars_in_time_order() -> None:
     seen: list[datetime] = []
 
-    def strategy(bars: tuple[BarEvent, ...]) -> list[SignalEvent]:
+    def strategy(bars: Sequence[BarEvent]) -> list[SignalEvent]:
         seen.append(bars[-1].timestamp)
         return []
 
@@ -54,7 +56,7 @@ def test_replays_bars_in_time_order() -> None:
 
 
 def test_stop_loss_hit_closes_trade() -> None:
-    def strategy(bars: tuple[BarEvent, ...]) -> list[SignalEvent]:
+    def strategy(bars: Sequence[BarEvent]) -> list[SignalEvent]:
         if len(bars) == 1:
             return [buy_signal(bars[-1], quantity="1", stop_loss="95", take_profit="110")]
         return []
@@ -73,7 +75,7 @@ def test_stop_loss_hit_closes_trade() -> None:
 
 
 def test_take_profit_hit_closes_trade() -> None:
-    def strategy(bars: tuple[BarEvent, ...]) -> list[SignalEvent]:
+    def strategy(bars: Sequence[BarEvent]) -> list[SignalEvent]:
         if len(bars) == 1:
             return [buy_signal(bars[-1], quantity="1", stop_loss="95", take_profit="105")]
         return []
@@ -91,8 +93,54 @@ def test_take_profit_hit_closes_trade() -> None:
     assert result.trades[0].net_pnl == Decimal("5")
 
 
+def test_stop_tightening_moves_to_breakeven_after_half_r() -> None:
+    def strategy(bars: Sequence[BarEvent]) -> list[SignalEvent]:
+        if len(bars) == 1:
+            return [buy_signal(bars[-1], quantity="1", stop_loss="95", take_profit="120")]
+        return []
+
+    result = BacktestEngine(
+        strategy=strategy,
+        config=BacktestConfig(stop_tightening_enabled=True),
+    ).run(
+        [
+            bar(0, close="100"),
+            bar(1, close="102", high="102.5", low="100.5"),
+            bar(2, close="100", high="101", low="99.5"),
+        ]
+    )
+
+    assert len(result.trades) == 1
+    assert result.trades[0].exit_reason == "stop_loss"
+    assert result.trades[0].exit_price == Decimal("100")
+    assert result.trades[0].net_pnl == Decimal("0")
+
+
+def test_stop_tightening_trails_to_quarter_r_after_one_r() -> None:
+    def strategy(bars: Sequence[BarEvent]) -> list[SignalEvent]:
+        if len(bars) == 1:
+            return [buy_signal(bars[-1], quantity="1", stop_loss="95", take_profit="120")]
+        return []
+
+    result = BacktestEngine(
+        strategy=strategy,
+        config=BacktestConfig(stop_tightening_enabled=True),
+    ).run(
+        [
+            bar(0, close="100"),
+            bar(1, close="105", high="105", low="100.5"),
+            bar(2, close="101", high="102", low="101"),
+        ]
+    )
+
+    assert len(result.trades) == 1
+    assert result.trades[0].exit_reason == "stop_loss"
+    assert result.trades[0].exit_price == Decimal("101.25")
+    assert result.trades[0].net_pnl == Decimal("1.25")
+
+
 def test_spread_and_slippage_reduce_realized_pnl() -> None:
-    def strategy(bars: tuple[BarEvent, ...]) -> list[SignalEvent]:
+    def strategy(bars: Sequence[BarEvent]) -> list[SignalEvent]:
         if len(bars) == 1:
             return [buy_signal(bars[-1], quantity="1")]
         if len(bars) == 2:
@@ -124,8 +172,42 @@ def test_spread_and_slippage_reduce_realized_pnl() -> None:
     assert cost_result.trades[0].net_pnl == Decimal("0.70")
 
 
+def test_entry_exit_slippage_and_spread_multiplier_are_separate_execution_costs() -> None:
+    def strategy(bars: Sequence[BarEvent]) -> list[SignalEvent]:
+        if len(bars) == 1:
+            return [buy_signal(bars[-1], quantity="1")]
+        if len(bars) == 2:
+            current = bars[-1]
+            return [
+                SignalEvent(
+                    timestamp=current.timestamp,
+                    correlation_id="exit",
+                    signal_id="exit",
+                    strategy_id="test-strategy",
+                    instrument=current.instrument,
+                    side=Side.FLAT,
+                    strength=Decimal("1"),
+                )
+            ]
+        return []
+
+    result = BacktestEngine(
+        strategy=strategy,
+        config=BacktestConfig(
+            spread=Decimal("0.20"),
+            spread_multiplier=Decimal("2"),
+            entry_slippage=Decimal("0.03"),
+            exit_slippage=Decimal("0.07"),
+        ),
+    ).run([bar(0, close="100"), bar(1, close="101")])
+
+    assert result.trades[0].entry_price == Decimal("100.23")
+    assert result.trades[0].exit_price == Decimal("100.73")
+    assert result.trades[0].net_pnl == Decimal("0.50")
+
+
 def test_event_log_is_deterministic_and_replayable() -> None:
-    def strategy(bars: tuple[BarEvent, ...]) -> list[SignalEvent]:
+    def strategy(bars: Sequence[BarEvent]) -> list[SignalEvent]:
         if len(bars) == 1:
             return [buy_signal(bars[-1], quantity="1", stop_loss="95", take_profit="105")]
         return []
