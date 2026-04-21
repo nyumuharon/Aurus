@@ -4,10 +4,15 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
+from _pytest.logging import LogCaptureFixture
 from aurus.common.schemas import OrderIntent, OrderStatus, OrderType, Side
 from aurus.execution import InMemoryExecutionRepository, PaperExecutionAdapter, PaperExecutionConfig
 
 NOW = datetime(2026, 4, 21, 12, 0, tzinfo=UTC)
+
+
+def log_event(record: object) -> object:
+    return getattr(record, "event", None)
 
 
 def clock() -> datetime:
@@ -45,7 +50,9 @@ def test_idempotent_submissions_return_existing_order_and_single_fill() -> None:
     assert adapter.positions()[0].quantity == Decimal("1")
 
 
-def test_position_state_transitions_open_add_reduce_and_close(caplog) -> None:
+def test_position_state_transitions_open_add_reduce_and_close(
+    caplog: LogCaptureFixture,
+) -> None:
     adapter = PaperExecutionAdapter(
         clock=clock,
         config=PaperExecutionConfig(default_fill_price=Decimal("100")),
@@ -68,10 +75,12 @@ def test_position_state_transitions_open_add_reduce_and_close(caplog) -> None:
     closed = adapter.positions()[0]
     assert closed.quantity == Decimal("0")
     assert closed.average_price is None
-    assert any(record.event == "execution.position_closed" for record in caplog.records)
+    assert any(log_event(record) == "execution.position_closed" for record in caplog.records)
 
 
-def test_rejection_handling_persists_order_without_fill_and_logs(caplog) -> None:
+def test_rejection_handling_persists_order_without_fill_and_logs(
+    caplog: LogCaptureFixture,
+) -> None:
     adapter = PaperExecutionAdapter(
         clock=clock,
         config=PaperExecutionConfig(max_quantity=Decimal("1")),
@@ -84,7 +93,7 @@ def test_rejection_handling_persists_order_without_fill_and_logs(caplog) -> None
     assert order.message == "quantity exceeds paper execution limit"
     assert adapter.list_fills() == ()
     assert adapter.positions() == ()
-    assert any(record.event == "execution.order_rejected" for record in caplog.records)
+    assert any(log_event(record) == "execution.order_rejected" for record in caplog.records)
 
 
 def test_order_normalization_rounds_quantity_and_price() -> None:
