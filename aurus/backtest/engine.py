@@ -57,7 +57,7 @@ class BacktestEngine:
             self._check_protective_exit(state, bar)
             state.bars.append(bar)
 
-            signals = self.strategy(tuple(state.bars))
+            signals = self.strategy(state.bars)
             for signal in signals:
                 self._record_event(state, signal)
                 self._process_signal(state, bar, signal)
@@ -151,6 +151,7 @@ class BacktestEngine:
         for event in (intent, order, fill):
             self._record_event(state, event)
 
+        stop_loss = _decimal_feature(signal, "stop_loss", None)
         state.position = OpenPosition(
             instrument=signal.instrument,
             side=signal.side,
@@ -158,8 +159,13 @@ class BacktestEngine:
             entry_timestamp=bar.timestamp,
             entry_price=fill_price,
             entry_fill_id=fill_id,
-            stop_loss=_decimal_feature(signal, "stop_loss", None),
+            stop_loss=stop_loss,
             take_profit=_decimal_feature(signal, "take_profit", None),
+            initial_risk_per_unit=_initial_risk_per_unit(
+                side=signal.side,
+                entry_price=fill_price,
+                stop_loss=stop_loss,
+            ),
             commission=self.config.commission_per_fill,
         )
 
@@ -175,6 +181,8 @@ class BacktestEngine:
             if position.take_profit is not None and bar.high >= position.take_profit:
                 self._close_position(state, bar, "take_profit", position.take_profit)
                 return
+            self._tighten_stop(position, bar)
+            return
 
         if position.side == Side.SELL:
             if position.stop_loss is not None and bar.high >= position.stop_loss:
@@ -182,6 +190,40 @@ class BacktestEngine:
                 return
             if position.take_profit is not None and bar.low <= position.take_profit:
                 self._close_position(state, bar, "take_profit", position.take_profit)
+                return
+            self._tighten_stop(position, bar)
+
+    def _tighten_stop(self, position: OpenPosition, bar: BarEvent) -> None:
+        if not self.config.stop_tightening_enabled:
+            return
+        if position.initial_risk_per_unit is None or position.initial_risk_per_unit <= Decimal("0"):
+            return
+
+        risk = position.initial_risk_per_unit
+        current_stop = position.stop_loss
+        if position.side == Side.BUY:
+            favorable_excursion = bar.high - position.entry_price
+            tightened_stop = _tightened_buy_stop(
+                entry_price=position.entry_price,
+                risk=risk,
+                current_stop=current_stop,
+                favorable_excursion=favorable_excursion,
+                config=self.config,
+            )
+        elif position.side == Side.SELL:
+            favorable_excursion = position.entry_price - bar.low
+            tightened_stop = _tightened_sell_stop(
+                entry_price=position.entry_price,
+                risk=risk,
+                current_stop=current_stop,
+                favorable_excursion=favorable_excursion,
+                config=self.config,
+            )
+        else:
+            return
+
+        if tightened_stop is not None:
+            position.stop_loss = tightened_stop
 
     def _close_position(
         self,
@@ -256,10 +298,11 @@ class BacktestEngine:
 
     def _entry_price(self, bar: BarEvent, side: Side) -> Decimal:
         half_spread = self._bar_spread(bar) / Decimal("2")
+        slippage = self._entry_slippage()
         if side == Side.BUY:
-            return bar.close + half_spread + self.config.slippage
+            return bar.close + half_spread + slippage
         if side == Side.SELL:
-            return bar.close - half_spread - self.config.slippage
+            return bar.close - half_spread - slippage
         raise ValueError("entry side cannot be flat")
 
     def _exit_price(
@@ -270,14 +313,30 @@ class BacktestEngine:
     ) -> Decimal:
         base_price = trigger_price or bar.close
         half_spread = self._bar_spread(bar) / Decimal("2")
+        slippage = self._exit_slippage()
         if side == Side.BUY:
-            return base_price + half_spread + self.config.slippage
+            return base_price + half_spread + slippage
         if side == Side.SELL:
-            return base_price - half_spread - self.config.slippage
+            return base_price - half_spread - slippage
         raise ValueError("exit side cannot be flat")
 
     def _bar_spread(self, bar: BarEvent) -> Decimal:
-        return bar.spread if bar.spread is not None else self.config.spread
+        base_spread = bar.spread if bar.spread is not None else self.config.spread
+        return base_spread * self.config.spread_multiplier
+
+    def _entry_slippage(self) -> Decimal:
+        return (
+            self.config.entry_slippage
+            if self.config.entry_slippage is not None
+            else self.config.slippage
+        )
+
+    def _exit_slippage(self) -> Decimal:
+        return (
+            self.config.exit_slippage
+            if self.config.exit_slippage is not None
+            else self.config.slippage
+        )
 
     def _mark_equity(self, state: BacktestState, bar: BarEvent) -> None:
         unrealized = Decimal("0")
@@ -302,6 +361,9 @@ class BacktestEngine:
                 equity=equity,
             )
         )
+        if not self.config.record_events:
+            return
+
         self._record_event(
             state,
             PositionSnapshot(
@@ -328,6 +390,8 @@ class BacktestEngine:
         return (position.entry_price - exit_price) * position.quantity
 
     def _record_event(self, state: BacktestState, event: DomainModel) -> None:
+        if not self.config.record_events:
+            return
         state.events.append(event)
 
     def _build_result(self, state: BacktestState) -> BacktestResult:
@@ -351,3 +415,64 @@ def _decimal_feature(
     if isinstance(raw_value, bool):
         raise ValueError(f"{key} cannot be a boolean")
     return Decimal(str(raw_value))
+
+
+def _initial_risk_per_unit(
+    *,
+    side: Side,
+    entry_price: Decimal,
+    stop_loss: Decimal | None,
+) -> Decimal | None:
+    if stop_loss is None:
+        return None
+    if side == Side.BUY:
+        risk = entry_price - stop_loss
+    elif side == Side.SELL:
+        risk = stop_loss - entry_price
+    else:
+        return None
+    return risk if risk > Decimal("0") else None
+
+
+def _tightened_buy_stop(
+    *,
+    entry_price: Decimal,
+    risk: Decimal,
+    current_stop: Decimal | None,
+    favorable_excursion: Decimal,
+    config: BacktestConfig,
+) -> Decimal | None:
+    candidate = current_stop
+    if favorable_excursion >= risk * config.breakeven_trigger_r:
+        candidate = _max_decimal(candidate, entry_price)
+    if favorable_excursion >= risk * config.trailing_trigger_r:
+        candidate = _max_decimal(candidate, entry_price + (risk * config.trailing_stop_r))
+    return candidate
+
+
+def _tightened_sell_stop(
+    *,
+    entry_price: Decimal,
+    risk: Decimal,
+    current_stop: Decimal | None,
+    favorable_excursion: Decimal,
+    config: BacktestConfig,
+) -> Decimal | None:
+    candidate = current_stop
+    if favorable_excursion >= risk * config.breakeven_trigger_r:
+        candidate = _min_decimal(candidate, entry_price)
+    if favorable_excursion >= risk * config.trailing_trigger_r:
+        candidate = _min_decimal(candidate, entry_price - (risk * config.trailing_stop_r))
+    return candidate
+
+
+def _max_decimal(current: Decimal | None, candidate: Decimal) -> Decimal:
+    if current is None:
+        return candidate
+    return max(current, candidate)
+
+
+def _min_decimal(current: Decimal | None, candidate: Decimal) -> Decimal:
+    if current is None:
+        return candidate
+    return min(current, candidate)
