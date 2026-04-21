@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 
 from aurus.backtest.types import BacktestResult, EquityPoint, TradeRecord
 from aurus.common.schemas import BarEvent
@@ -75,7 +76,7 @@ def equity_curve() -> tuple[EquityPoint, ...]:
     )
 
 
-def test_journal_write_read_round_trip(tmp_path) -> None:
+def test_journal_write_read_round_trip(tmp_path: Path) -> None:
     journal = EventJournal(tmp_path / "events.jsonl")
     events = (bar_event(0), bar_event(1))
 
@@ -115,7 +116,7 @@ def test_in_memory_ledger_persistence_behavior() -> None:
     assert repository.read_all() == trades
 
 
-def test_csv_ledger_persistence_behavior(tmp_path) -> None:
+def test_csv_ledger_persistence_behavior(tmp_path: Path) -> None:
     repository = CsvTradeLedgerRepository(tmp_path / "ledger.csv")
     trades = (trade(0, Decimal("10")), trade(1, Decimal("-5")))
 
@@ -143,4 +144,3 @@ def test_backtest_result_summary_smoke() -> None:
     )
 
     assert result.trades[0].net_pnl == Decimal("10")
-
