@@ -2,10 +2,16 @@
 
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
+from _pytest.logging import LogCaptureFixture
 from aurus.common.schemas import BarEvent
 from aurus.data import CsvBarLoader, TradingSession, find_missing_bars, tag_session
+
+
+def log_event(record: object) -> object:
+    return getattr(record, "event", None)
 
 
 def make_bar(timestamp: datetime) -> BarEvent:
@@ -21,7 +27,7 @@ def make_bar(timestamp: datetime) -> BarEvent:
     )
 
 
-def test_csv_loader_normalizes_timestamps_to_utc(tmp_path) -> None:
+def test_csv_loader_normalizes_timestamps_to_utc(tmp_path: Path) -> None:
     csv_path = tmp_path / "bars.csv"
     csv_path.write_text(
         "\n".join(
@@ -40,7 +46,10 @@ def test_csv_loader_normalizes_timestamps_to_utc(tmp_path) -> None:
     assert bars[0].metadata["session"] == TradingSession.ASIA.value
 
 
-def test_csv_loader_rejects_duplicate_timestamps_and_logs_issue(tmp_path, caplog) -> None:
+def test_csv_loader_rejects_duplicate_timestamps_and_logs_issue(
+    tmp_path: Path,
+    caplog: LogCaptureFixture,
+) -> None:
     csv_path = tmp_path / "bars.csv"
     csv_path.write_text(
         "\n".join(
@@ -59,7 +68,9 @@ def test_csv_loader_rejects_duplicate_timestamps_and_logs_issue(tmp_path, caplog
     ):
         CsvBarLoader(csv_path).load_bars()
 
-    assert any(record.event == "data_quality.duplicate_timestamps" for record in caplog.records)
+    assert any(
+        log_event(record) == "data_quality.duplicate_timestamps" for record in caplog.records
+    )
 
 
 @pytest.mark.parametrize(
@@ -79,7 +90,7 @@ def test_session_tagging_correctness(timestamp: datetime, expected: TradingSessi
     assert tag_session(timestamp) == expected
 
 
-def test_missing_bar_detection_on_sample_data(caplog) -> None:
+def test_missing_bar_detection_on_sample_data(caplog: LogCaptureFixture) -> None:
     bars = [
         make_bar(datetime(2026, 4, 20, 7, 0, tzinfo=UTC)),
         make_bar(datetime(2026, 4, 20, 7, 1, tzinfo=UTC)),
@@ -94,4 +105,4 @@ def test_missing_bar_detection_on_sample_data(caplog) -> None:
         datetime(2026, 4, 20, 7, 2, tzinfo=UTC),
         datetime(2026, 4, 20, 7, 3, tzinfo=UTC),
     )
-    assert any(record.event == "data_quality.missing_bars" for record in caplog.records)
+    assert any(log_event(record) == "data_quality.missing_bars" for record in caplog.records)
