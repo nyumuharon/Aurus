@@ -5,57 +5,85 @@ from decimal import Decimal
 
 import pytest
 from aurus.common.schemas import Side, SignalEvent
-from aurus.risk import NewsBlackoutWindow, RiskConfig, RiskKernel, RiskSnapshot
+from aurus.risk import NewsBlackoutWindow, RiskConfig, RiskEvaluation, RiskKernel, RiskSnapshot
+from pydantic import JsonValue
 
 NOW = datetime(2026, 4, 21, 10, 0, tzinfo=UTC)
 
 
-def config(**overrides: object) -> RiskConfig:
-    values = {
-        "max_daily_realized_loss": Decimal("500"),
-        "max_total_drawdown": Decimal("1000"),
-        "max_trades_per_day": 3,
-        "max_spread": Decimal("0.50"),
-        "blocked_sessions": frozenset({"rollover"}),
-        "max_consecutive_losses": 2,
-        "require_stop_loss": True,
-        "max_concurrent_positions": 1,
-        "news_blackout_windows": (),
-    }
-    values.update(overrides)
-    return RiskConfig(**values)
+def config(
+    *,
+    max_daily_realized_loss: Decimal = Decimal("500"),
+    max_total_drawdown: Decimal = Decimal("1000"),
+    max_trades_per_day: int = 3,
+    max_spread: Decimal = Decimal("0.50"),
+    blocked_sessions: frozenset[str] = frozenset({"rollover"}),
+    max_consecutive_losses: int = 2,
+    require_stop_loss: bool = True,
+    max_concurrent_positions: int = 1,
+    news_blackout_windows: tuple[NewsBlackoutWindow, ...] = (),
+) -> RiskConfig:
+    return RiskConfig(
+        max_daily_realized_loss=max_daily_realized_loss,
+        max_total_drawdown=max_total_drawdown,
+        max_trades_per_day=max_trades_per_day,
+        max_spread=max_spread,
+        blocked_sessions=blocked_sessions,
+        max_consecutive_losses=max_consecutive_losses,
+        require_stop_loss=require_stop_loss,
+        max_concurrent_positions=max_concurrent_positions,
+        news_blackout_windows=news_blackout_windows,
+    )
 
 
-def snapshot(**overrides: object) -> RiskSnapshot:
-    values = {
-        "timestamp": NOW,
-        "realized_pnl_today": Decimal("0"),
-        "current_equity": Decimal("100000"),
-        "peak_equity": Decimal("100000"),
-        "trades_today": 0,
-        "spread": Decimal("0.20"),
-        "session": "london",
-        "seen_signal_ids": frozenset(),
-        "consecutive_losses": 0,
-        "open_positions": 0,
-    }
-    values.update(overrides)
-    return RiskSnapshot(**values)
+def snapshot(
+    *,
+    timestamp: datetime = NOW,
+    realized_pnl_today: Decimal = Decimal("0"),
+    current_equity: Decimal = Decimal("100000"),
+    peak_equity: Decimal = Decimal("100000"),
+    trades_today: int = 0,
+    spread: Decimal = Decimal("0.20"),
+    session: str = "london",
+    seen_signal_ids: frozenset[str] = frozenset(),
+    consecutive_losses: int = 0,
+    open_positions: int = 0,
+) -> RiskSnapshot:
+    return RiskSnapshot(
+        timestamp=timestamp,
+        realized_pnl_today=realized_pnl_today,
+        current_equity=current_equity,
+        peak_equity=peak_equity,
+        trades_today=trades_today,
+        spread=spread,
+        session=session,
+        seen_signal_ids=seen_signal_ids,
+        consecutive_losses=consecutive_losses,
+        open_positions=open_positions,
+    )
 
 
-def signal(**overrides: object) -> SignalEvent:
-    values = {
-        "timestamp": NOW,
-        "correlation_id": "corr-1",
-        "signal_id": "signal-1",
-        "strategy_id": "risk-test",
-        "instrument": "XAU/USD",
-        "side": Side.BUY,
-        "strength": Decimal("1"),
-        "features": {"stop_loss": "2380.00"},
-    }
-    values.update(overrides)
-    return SignalEvent(**values)
+def signal(
+    *,
+    timestamp: datetime = NOW,
+    correlation_id: str = "corr-1",
+    signal_id: str = "signal-1",
+    strategy_id: str = "risk-test",
+    instrument: str = "XAU/USD",
+    side: Side = Side.BUY,
+    strength: Decimal = Decimal("1"),
+    features: dict[str, JsonValue] | None = None,
+) -> SignalEvent:
+    return SignalEvent(
+        timestamp=timestamp,
+        correlation_id=correlation_id,
+        signal_id=signal_id,
+        strategy_id=strategy_id,
+        instrument=instrument,
+        side=side,
+        strength=strength,
+        features=features if features is not None else {"stop_loss": "2380.00"},
+    )
 
 
 def evaluate(
@@ -63,7 +91,7 @@ def evaluate(
     risk_config: RiskConfig | None = None,
     risk_snapshot: RiskSnapshot | None = None,
     risk_signal: SignalEvent | None = None,
-):
+) -> RiskEvaluation:
     return RiskKernel(risk_config or config()).evaluate_structured(
         risk_signal or signal(),
         risk_snapshot or snapshot(),
@@ -73,9 +101,9 @@ def evaluate(
 def assert_denied_for(
     reason: str,
     *,
-    risk_config=None,
-    risk_snapshot=None,
-    risk_signal=None,
+    risk_config: RiskConfig | None = None,
+    risk_snapshot: RiskSnapshot | None = None,
+    risk_signal: SignalEvent | None = None,
 ) -> None:
     result = evaluate(
         risk_config=risk_config,
@@ -88,7 +116,9 @@ def assert_denied_for(
     assert result.decision.action == "reject"
     assert reason in result.reasons
     assert reason in result.decision.reason
-    assert reason in result.decision.metadata["reasons"]
+    metadata_reasons = result.decision.metadata["reasons"]
+    assert isinstance(metadata_reasons, list)
+    assert reason in metadata_reasons
 
 
 def test_all_rules_allow_valid_signal() -> None:
