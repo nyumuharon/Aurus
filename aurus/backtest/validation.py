@@ -75,6 +75,26 @@ class RealDataValidationReport:
     gap_policy: GapPolicyReport
 
 
+@dataclass(frozen=True)
+class ReadinessGateConfig:
+    """Explicit thresholds for demo-forward readiness checks."""
+
+    require_no_unexpected_gaps: bool = True
+    require_full_sample_positive: bool = True
+    require_all_segments_positive: bool = True
+    require_all_walk_forward_positive: bool = True
+    max_spread_breach_rate: Decimal = Decimal("0.01")
+
+
+@dataclass(frozen=True)
+class ReadinessDecision:
+    """Deterministic go/no-go result for demo-forward operation."""
+
+    ready: bool
+    blockers: tuple[str, ...]
+    warnings: tuple[str, ...]
+
+
 def run_real_data_validation(
     *,
     data: IngestedMarketData,
@@ -118,6 +138,65 @@ def run_real_data_validation(
             backtest_config=backtest_config,
         ),
         gap_policy=classify_xauusd_gaps(data.report.missing_gaps),
+    )
+
+
+def evaluate_demo_readiness(
+    report: RealDataValidationReport,
+    *,
+    config: ReadinessGateConfig | None = None,
+) -> ReadinessDecision:
+    """Evaluate whether current evidence is sufficient for demo-forward operation."""
+
+    gate_config = config or ReadinessGateConfig()
+    blockers: list[str] = []
+    warnings: list[str] = []
+
+    if (
+        gate_config.require_no_unexpected_gaps
+        and report.gap_policy.has_unexpected_gaps
+    ):
+        blockers.append(
+            "unexpected data gaps remain outside the coarse XAU/USD closure policy"
+        )
+
+    if gate_config.require_full_sample_positive and not _positive_sample(report.full_sample):
+        blockers.append("full-sample net PnL and profit factor are not both positive")
+
+    if gate_config.require_all_segments_positive:
+        failed_segments = tuple(
+            row.label for row in report.segments if not _positive_sample(row)
+        )
+        if failed_segments:
+            blockers.append(
+                "chronological segment failure: " + ", ".join(failed_segments)
+            )
+
+    if gate_config.require_all_walk_forward_positive:
+        failed_windows = tuple(
+            row.label for row in report.walk_forward if not _positive_sample(row)
+        )
+        if failed_windows:
+            blockers.append(
+                f"{len(failed_windows)} walk-forward windows failed positivity gates"
+            )
+
+    spread_breach_rate = report.spread_costs.pct_above_strategy_max_spread
+    if spread_breach_rate > gate_config.max_spread_breach_rate:
+        blockers.append(
+            "spread breach rate exceeds readiness threshold: "
+            f"{spread_breach_rate} > {gate_config.max_spread_breach_rate}"
+        )
+    elif report.spread_costs.bars_above_strategy_max_spread > 0:
+        warnings.append(
+            "some bars exceeded the strategy spread limit: "
+            f"{report.spread_costs.bars_above_strategy_max_spread}"
+        )
+
+    return ReadinessDecision(
+        ready=not blockers,
+        blockers=tuple(blockers),
+        warnings=tuple(warnings),
     )
 
 
@@ -247,3 +326,11 @@ def _quantile(values: Sequence[Decimal], quantile: Decimal) -> Decimal:
         return Decimal("0")
     index = int((Decimal(len(values) - 1) * quantile).to_integral_value())
     return values[index]
+
+
+def _positive_sample(row: ValidationMetrics) -> bool:
+    return (
+        row.net_pnl > Decimal("0")
+        and row.profit_factor is not None
+        and row.profit_factor > Decimal("1")
+    )

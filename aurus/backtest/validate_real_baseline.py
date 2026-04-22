@@ -14,6 +14,7 @@ from aurus.backtest.run_real_baseline import (
 from aurus.backtest.validation import (
     RealDataValidationReport,
     ValidationMetrics,
+    evaluate_demo_readiness,
     run_real_data_validation,
 )
 from aurus.data import load_real_xauusd_5m_csv
@@ -100,6 +101,7 @@ def validation_row(row: ValidationMetrics) -> dict[str, str]:
 def format_validation_report(report: RealDataValidationReport) -> str:
     """Render a concise validation report."""
 
+    readiness = evaluate_demo_readiness(report)
     profitable_windows = sum(1 for row in report.walk_forward if row.net_pnl > Decimal("0"))
     positive_pf_windows = sum(
         1
@@ -138,6 +140,11 @@ def format_validation_report(report: RealDataValidationReport) -> str:
             f"unexpected gaps: {report.gap_policy.unexpected_gaps}",
             f"expected missing bars: {report.gap_policy.expected_missing_bars}",
             f"unexpected missing bars: {report.gap_policy.unexpected_missing_bars}",
+            "",
+            "Demo readiness",
+            f"ready: {readiness.ready}",
+            "blockers: " + _format_items(readiness.blockers),
+            "warnings: " + _format_items(readiness.warnings),
         ]
     )
     return "\n".join(lines)
@@ -151,6 +158,10 @@ def format_metrics(row: ValidationMetrics) -> str:
         f"PF={format_decimal(row.profit_factor)} max_dd={row.max_drawdown} "
         f"net_pnl={row.net_pnl}"
     )
+
+
+def _format_items(items: tuple[str, ...]) -> str:
+    return "none" if not items else " | ".join(items)
 
 
 if __name__ == "__main__":

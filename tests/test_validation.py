@@ -5,7 +5,12 @@ from decimal import Decimal
 
 from aurus.backtest.types import BacktestConfig
 from aurus.backtest.validation import (
+    ReadinessGateConfig,
+    RealDataValidationReport,
+    SpreadCostReport,
+    ValidationMetrics,
     chronological_segments,
+    evaluate_demo_readiness,
     rolling_windows,
     spread_cost_report,
 )
@@ -14,9 +19,11 @@ from aurus.data.gap_policy import classify_xauusd_gaps
 from aurus.data.quality import MissingBarGap
 from aurus.strategy import BaselineStrategyConfig
 
+NOW = datetime(2026, 4, 20, tzinfo=UTC)
+
 
 def bar(index: int, *, spread: Decimal = Decimal("0.20")) -> BarEvent:
-    timestamp = datetime(2026, 4, 20, tzinfo=UTC) + timedelta(minutes=5 * index)
+    timestamp = NOW + timedelta(minutes=5 * index)
     return BarEvent(
         timestamp=timestamp,
         correlation_id=f"bar-{index}",
@@ -86,3 +93,102 @@ def test_gap_policy_separates_weekend_and_unexpected_gaps() -> None:
     assert report.expected_missing_bars == 1
     assert report.unexpected_missing_bars == 1
     assert report.has_unexpected_gaps is True
+
+
+def validation_metrics(label: str = "sample") -> ValidationMetrics:
+    return ValidationMetrics(
+        label=label,
+        start=NOW,
+        end=NOW + timedelta(hours=1),
+        bars=12,
+        trades=3,
+        win_rate=Decimal("0.67"),
+        profit_factor=Decimal("1.50"),
+        max_drawdown=Decimal("10"),
+        net_pnl=Decimal("25"),
+    )
+
+
+def readiness_report(
+    *,
+    gap_report_unexpected: bool = False,
+    spread_breaches: int = 0,
+    failed_segment: bool = False,
+) -> RealDataValidationReport:
+    segment = (
+        ValidationMetrics(
+            label="early",
+            start=NOW,
+            end=NOW + timedelta(hours=1),
+            bars=12,
+            trades=3,
+            win_rate=Decimal("0.33"),
+            profit_factor=Decimal("0.80"),
+            max_drawdown=Decimal("10"),
+            net_pnl=Decimal("-5"),
+        )
+        if failed_segment
+        else validation_metrics("early")
+    )
+    return RealDataValidationReport(
+        full_sample=validation_metrics("full"),
+        segments=(segment,),
+        walk_forward=(validation_metrics("wf-001"),),
+        spread_costs=SpreadCostReport(
+            bars_with_spread=100,
+            min_spread=Decimal("0.10"),
+            median_spread=Decimal("0.20"),
+            p95_spread=Decimal("0.30"),
+            max_spread=Decimal("0.60"),
+            bars_above_strategy_max_spread=spread_breaches,
+            strategy_max_spread=Decimal("0.50"),
+            configured_entry_slippage=Decimal("0"),
+            configured_exit_slippage=Decimal("0"),
+        ),
+        gap_policy=classify_xauusd_gaps(
+            (
+                MissingBarGap(
+                    previous_timestamp=NOW,
+                    next_timestamp=NOW + timedelta(minutes=10),
+                    missing_timestamps=(NOW + timedelta(minutes=5),),
+                ),
+            )
+            if gap_report_unexpected
+            else ()
+        ),
+    )
+
+
+def test_readiness_passes_when_validation_is_clean() -> None:
+    decision = evaluate_demo_readiness(readiness_report())
+
+    assert decision.ready is True
+    assert decision.blockers == ()
+    assert decision.warnings == ()
+
+
+def test_readiness_blocks_unexpected_gaps_and_failed_segments() -> None:
+    decision = evaluate_demo_readiness(
+        readiness_report(gap_report_unexpected=True, failed_segment=True)
+    )
+
+    assert decision.ready is False
+    assert any("unexpected data gaps" in blocker for blocker in decision.blockers)
+    assert any("chronological segment failure" in blocker for blocker in decision.blockers)
+
+
+def test_readiness_warns_for_small_spread_breach_rate() -> None:
+    decision = evaluate_demo_readiness(readiness_report(spread_breaches=1))
+
+    assert decision.ready is True
+    assert decision.warnings == ("some bars exceeded the strategy spread limit: 1",)
+
+
+def test_readiness_blocks_large_spread_breach_rate() -> None:
+    decision = evaluate_demo_readiness(
+        readiness_report(spread_breaches=2),
+        config=ReadinessGateConfig(max_spread_breach_rate=Decimal("0.01")),
+    )
+
+    assert decision.ready is False
+    assert any("spread breach rate exceeds" in blocker for blocker in decision.blockers)
