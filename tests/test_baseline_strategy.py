@@ -177,6 +177,7 @@ def config(
     confirmation_mode: ConfirmationMode = "strict",
     entry_mode: EntryMode = "baseline",
     min_pullback_depth_atr: Decimal = Decimal("0"),
+    min_pre_entry_extension_atr: Decimal = Decimal("0"),
     continuation_pullback_tolerance: Decimal = Decimal("0.50"),
 ) -> BaselineStrategyConfig:
     return BaselineStrategyConfig(
@@ -203,6 +204,7 @@ def config(
         confirmation_mode=confirmation_mode,
         entry_mode=entry_mode,
         min_pullback_depth_atr=min_pullback_depth_atr,
+        min_pre_entry_extension_atr=min_pre_entry_extension_atr,
         continuation_pullback_tolerance=continuation_pullback_tolerance,
     )
 
@@ -562,6 +564,28 @@ def test_pullback_depth_is_recorded_on_signal() -> None:
     assert len(signals) == 1
     assert signals[0].features["min_pullback_depth_atr"] == "0.25"
     assert Decimal(str(signals[0].features["pullback_depth_atr"])) >= Decimal("0.25")
+
+
+def test_blocked_signal_under_min_pre_entry_extension_filter() -> None:
+    strategy = BaselineXauUsdStrategy(
+        context_bars=context_bars(Side.BUY),
+        config=config(min_pre_entry_extension_atr=Decimal("2.00")),
+    )
+
+    assert strategy(tuple(long_execution_bars())) == []
+
+
+def test_pre_entry_extension_is_recorded_on_signal() -> None:
+    strategy = BaselineXauUsdStrategy(
+        context_bars=context_bars(Side.BUY),
+        config=config(min_pre_entry_extension_atr=Decimal("0.50")),
+    )
+
+    signals = strategy(tuple(long_execution_bars()))
+
+    assert len(signals) == 1
+    assert signals[0].features["min_pre_entry_extension_atr"] == "0.50"
+    assert Decimal(str(signals[0].features["pre_entry_extension_atr"])) > Decimal("0.50")
 
 
 def test_trend_strength_is_recorded_on_signal() -> None:

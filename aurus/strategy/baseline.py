@@ -43,6 +43,7 @@ class BaselineStrategyConfig:
     early_new_york_end_hour_utc: int = 16
     pullback_tolerance: Decimal = Decimal("0")
     min_pullback_depth_atr: Decimal = Decimal("0")
+    min_pre_entry_extension_atr: Decimal = Decimal("0")
     continuation_pullback_tolerance: Decimal = Decimal("0.50")
     atr_stop_floor_multiplier: Decimal = Decimal("1")
     reward_risk: Decimal = Decimal("2")
@@ -85,6 +86,8 @@ class BaselineDiagnostics:
     pullback_reject: int = 0
     confirmation_pass: int = 0
     confirmation_reject: int = 0
+    pre_entry_extension_pass: int = 0
+    pre_entry_extension_reject: int = 0
     final_signal_emission: int = 0
 
     def observe(
@@ -166,6 +169,12 @@ class BaselineDiagnostics:
 
         execution_ema = ema([bar.close for bar in execution_bars], config.execution_ema_period)
         ema_value = execution_ema[-2]
+        pre_entry_extension_atr = _pre_entry_extension_atr(
+            trend=trend,
+            current=current,
+            ema_value=ema_value,
+            atr_value=current_atr,
+        )
         if config.entry_mode == "baseline":
             pullback_depth_atr = _pullback_depth_atr(
                 trend=trend,
@@ -225,6 +234,14 @@ class BaselineDiagnostics:
             self.confirmation_pass += 1
         else:
             raise ValueError(f"unsupported entry_mode: {config.entry_mode}")
+        if not _passes_pre_entry_extension_filter(
+            pre_entry_extension_atr=pre_entry_extension_atr,
+            config=config,
+        ):
+            self.pre_entry_extension_reject += 1
+            self.final_signal_emission += len(emitted_signals)
+            return
+        self.pre_entry_extension_pass += 1
         self.final_signal_emission += len(emitted_signals)
 
     def rejection_counts(self) -> dict[str, int]:
@@ -240,6 +257,7 @@ class BaselineDiagnostics:
             "regime_filter": self.regime_filter_reject,
             "pullback_condition": self.pullback_reject,
             "confirmation_candle_condition": self.confirmation_reject,
+            "pre_entry_extension_filter": self.pre_entry_extension_reject,
         }
 
     def biggest_blocker(self) -> tuple[str, int]:
@@ -274,6 +292,8 @@ class BaselineDiagnostics:
                 f"pullback condition reject: {self.pullback_reject}",
                 f"confirmation candle condition pass: {self.confirmation_pass}",
                 f"confirmation candle condition reject: {self.confirmation_reject}",
+                f"pre-entry extension filter pass: {self.pre_entry_extension_pass}",
+                f"pre-entry extension filter reject: {self.pre_entry_extension_reject}",
                 f"final signal emission: {self.final_signal_emission}",
                 f"single biggest blocker: {biggest_name} ({biggest_count})",
             ]
@@ -385,6 +405,12 @@ class BaselineXauUsdStrategy:
             if self.config.entry_mode in {"early_momentum", "trend_continuation"}
             else execution_ema[-2]
         )
+        pre_entry_extension_atr = _pre_entry_extension_atr(
+            trend=trend,
+            current=current,
+            ema_value=entry_ema,
+            atr_value=current_atr,
+        )
         side = self._entry_side(
             trend=trend,
             previous=previous,
@@ -393,6 +419,17 @@ class BaselineXauUsdStrategy:
             atr_value=current_atr,
         )
         if side is None:
+            return []
+        if not _passes_pre_entry_extension_filter(
+            pre_entry_extension_atr=pre_entry_extension_atr,
+            config=self.config,
+        ):
+            self._log_block(
+                current,
+                "pre_entry_extension_below_threshold",
+                pre_entry_extension_atr=str(pre_entry_extension_atr),
+                min_pre_entry_extension_atr=str(self.config.min_pre_entry_extension_atr),
+            )
             return []
 
         stop_target = calculate_stop_target(
@@ -437,6 +474,10 @@ class BaselineXauUsdStrategy:
                     )
                 ),
                 "min_pullback_depth_atr": str(self.config.min_pullback_depth_atr),
+                "pre_entry_extension_atr": str(pre_entry_extension_atr),
+                "min_pre_entry_extension_atr": str(
+                    self.config.min_pre_entry_extension_atr
+                ),
                 "stop_loss": str(stop_target.stop_loss),
                 "take_profit": str(stop_target.take_profit),
                 "risk_per_unit": str(stop_target.risk_per_unit),
@@ -748,6 +789,32 @@ def _pullback_depth_atr(
     if trend == Side.SELL:
         return max(Decimal("0"), previous.high - ema_value) / atr_value
     return Decimal("0")
+
+
+def _pre_entry_extension_atr(
+    *,
+    trend: Side,
+    current: BarEvent,
+    ema_value: Decimal,
+    atr_value: Decimal,
+) -> Decimal:
+    if atr_value <= Decimal("0"):
+        return Decimal("0")
+    if trend == Side.BUY:
+        return (current.close - ema_value) / atr_value
+    if trend == Side.SELL:
+        return (ema_value - current.close) / atr_value
+    return Decimal("0")
+
+
+def _passes_pre_entry_extension_filter(
+    *,
+    pre_entry_extension_atr: Decimal,
+    config: BaselineStrategyConfig,
+) -> bool:
+    if config.min_pre_entry_extension_atr <= Decimal("0"):
+        return True
+    return pre_entry_extension_atr > config.min_pre_entry_extension_atr
 
 
 def _has_confirmation(
