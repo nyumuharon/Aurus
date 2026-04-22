@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import argparse
+from collections import defaultdict
+from collections.abc import Mapping
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -20,9 +23,7 @@ def current_daily_trend_config() -> DailyLondonTrendConfig:
     return DailyLondonTrendConfig(
         context_ema_period=20,
         context_atr_period=14,
-        windows=(
-            DailyTrendWindow(label="pre_london_full", entry_hour_utc=6, exit_hour_utc=21),
-        ),
+        windows=(DailyTrendWindow(label="pre_london_full", entry_hour_utc=6, exit_hour_utc=21),),
         atr_stop_multiplier=Decimal("3"),
         reward_risk=Decimal("2.5"),
     )
@@ -52,20 +53,82 @@ def run_daily_trend_backtest(
     ).run(data.execution_bars)
 
 
-def format_daily_trend_summary(result: BacktestResult) -> str:
-    """Render required metrics for daily trend checks."""
+def format_daily_trend_summary(
+    result: BacktestResult,
+    *,
+    starting_equity: Decimal = Decimal("10000"),
+) -> str:
+    """Render metrics plus the yearly/monthly account-style breakdown."""
 
     metrics = calculate_metrics(result.trades, result.equity_curve)
-    return "\n".join(
-        [
-            "Aurus daily London trend backtest summary",
-            f"total trades: {metrics.trade_count}",
-            f"win rate: {metrics.win_rate}",
-            f"profit factor: {format_decimal(metrics.profit_factor)}",
-            f"max drawdown: {metrics.max_drawdown}",
-            f"net PnL: {metrics.total_pnl}",
-        ]
-    )
+    annual_pnl = realized_pnl_by_year(result)
+    latest_year = max(annual_pnl) if annual_pnl else None
+    lines = [
+        "Aurus daily London trend backtest summary",
+        f"total trades: {metrics.trade_count}",
+        f"win rate: {metrics.win_rate}",
+        f"profit factor: {format_decimal(metrics.profit_factor)}",
+        f"max drawdown: {metrics.max_drawdown}",
+        f"net PnL: {metrics.total_pnl}",
+        f"starting equity: {starting_equity}",
+        "yearly PnL:",
+    ]
+    lines.extend(format_yearly_pnl(annual_pnl, starting_equity=starting_equity))
+    if latest_year is not None:
+        lines.append(f"{latest_year} monthly PnL:")
+        lines.extend(format_monthly_pnl(realized_pnl_by_month(result, year=latest_year)))
+    return "\n".join(lines)
+
+
+def realized_pnl_by_year(result: BacktestResult) -> dict[int, Decimal]:
+    """Group closed-trade realized PnL by exit year."""
+
+    pnl_by_year: defaultdict[int, Decimal] = defaultdict(Decimal)
+    for trade in result.trades:
+        pnl_by_year[trade.exit_timestamp.year] += trade.net_pnl
+    return dict(sorted(pnl_by_year.items()))
+
+
+def realized_pnl_by_month(result: BacktestResult, *, year: int) -> dict[datetime, Decimal]:
+    """Group closed-trade realized PnL by month for a year."""
+
+    pnl_by_month: defaultdict[datetime, Decimal] = defaultdict(Decimal)
+    for trade in result.trades:
+        if trade.exit_timestamp.year != year:
+            continue
+        month = datetime(
+            trade.exit_timestamp.year,
+            trade.exit_timestamp.month,
+            1,
+            tzinfo=trade.exit_timestamp.tzinfo,
+        )
+        pnl_by_month[month] += trade.net_pnl
+    return dict(sorted(pnl_by_month.items()))
+
+
+def format_yearly_pnl(
+    pnl_by_year: Mapping[int, Decimal],
+    *,
+    starting_equity: Decimal,
+) -> list[str]:
+    """Render yearly PnL with running ending equity."""
+
+    if not pnl_by_year:
+        return ["none"]
+    ending_equity = starting_equity
+    rows: list[str] = []
+    for year, pnl in pnl_by_year.items():
+        ending_equity += pnl
+        rows.append(f"{year}: PnL {pnl}, ending equity {ending_equity}")
+    return rows
+
+
+def format_monthly_pnl(pnl_by_month: Mapping[datetime, Decimal]) -> list[str]:
+    """Render monthly PnL rows."""
+
+    if not pnl_by_month:
+        return ["none"]
+    return [f"{month.year}-{month.month:02d}: PnL {pnl}" for month, pnl in pnl_by_month.items()]
 
 
 def parse_args() -> argparse.Namespace:
@@ -73,6 +136,12 @@ def parse_args() -> argparse.Namespace:
 
     parser = argparse.ArgumentParser(description="Run daily London trend on real XAU/USD CSV.")
     parser.add_argument("--data", required=True, type=Path, help="Real 5-minute CSV path.")
+    parser.add_argument(
+        "--starting-equity",
+        default=Decimal("10000"),
+        type=Decimal,
+        help="Starting equity for yearly/monthly reporting.",
+    )
     return parser.parse_args()
 
 
@@ -82,7 +151,7 @@ def main() -> None:
     args = parse_args()
     data = load_real_xauusd_5m_csv(args.data)
     result = run_daily_trend_backtest(data=data)
-    print(format_daily_trend_summary(result))
+    print(format_daily_trend_summary(result, starting_equity=args.starting_equity))
 
 
 if __name__ == "__main__":

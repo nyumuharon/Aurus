@@ -62,6 +62,11 @@ def test_daily_trend_emits_one_london_open_long_signal() -> None:
     assert signals[0].features["reward_risk"] == "1.5"
     assert signals[0].features["window_label"] == "london"
     assert Decimal(str(signals[0].features["risk_per_unit"])) > Decimal("0")
+    entry_price = Decimal(str(signals[0].features["assumed_entry_price"]))
+    stop_loss = Decimal(str(signals[0].features["stop_loss"]))
+    take_profit = Decimal(str(signals[0].features["take_profit"]))
+    assert stop_loss < entry_price < take_profit
+    assert take_profit - entry_price > entry_price - stop_loss
 
 
 def test_daily_trend_emits_short_signal_below_context_ema() -> None:
@@ -74,6 +79,11 @@ def test_daily_trend_emits_short_signal_below_context_ema() -> None:
 
     assert len(signals) == 1
     assert signals[0].side == Side.SELL
+    entry_price = Decimal(str(signals[0].features["assumed_entry_price"]))
+    stop_loss = Decimal(str(signals[0].features["stop_loss"]))
+    take_profit = Decimal(str(signals[0].features["take_profit"]))
+    assert take_profit < entry_price < stop_loss
+    assert entry_price - take_profit > stop_loss - entry_price
 
 
 def test_daily_trend_only_trades_configured_entry_time() -> None:

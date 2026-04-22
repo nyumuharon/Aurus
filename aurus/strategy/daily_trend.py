@@ -133,6 +133,7 @@ class DailyLondonTrendStrategy:
                     "context_ema": str(ema_value),
                     "context_atr": str(atr_value),
                     "atr_stop_multiplier": str(self.config.atr_stop_multiplier),
+                    "assumed_entry_price": str(entry_price),
                     "stop_loss": str(stop_loss),
                     "take_profit": str(take_profit),
                     "risk_per_unit": str(risk_per_unit),
