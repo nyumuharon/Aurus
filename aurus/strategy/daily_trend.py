@@ -24,6 +24,8 @@ class DailyLondonTrendConfig:
     context_atr_period: int = 14
     entry_hour_utc: int = 7
     entry_minute_utc: int = 0
+    exit_hour_utc: int = 20
+    exit_minute_utc: int = 0
     atr_stop_multiplier: Decimal = Decimal("3")
     reward_risk: Decimal = Decimal("1.5")
     quantity: Decimal = Decimal("1")
@@ -57,6 +59,25 @@ class DailyLondonTrendStrategy:
         current = bars[-1]
         if not self._is_execution_bar(current):
             return []
+        if (
+            current.timestamp.hour == self.config.exit_hour_utc
+            and current.timestamp.minute == self.config.exit_minute_utc
+        ):
+            return [
+                SignalEvent(
+                    timestamp=current.timestamp,
+                    correlation_id=f"daily-trend-exit-{current.correlation_id}",
+                    source=DAILY_TREND_SOURCE,
+                    signal_id=f"daily-trend-exit-{current.timestamp.isoformat()}",
+                    strategy_id="daily-london-trend-v1",
+                    instrument=current.instrument,
+                    side=Side.FLAT,
+                    strength=Decimal("0"),
+                    reason="daily_london_trend_session_exit",
+                    features={"quantity": str(self.config.quantity)},
+                )
+            ]
+
         if (
             current.timestamp.hour != self.config.entry_hour_utc
             or current.timestamp.minute != self.config.entry_minute_utc

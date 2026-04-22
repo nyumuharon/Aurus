@@ -87,3 +87,18 @@ def test_daily_trend_only_trades_configured_entry_time() -> None:
         )
         == []
     )
+
+
+def test_daily_trend_emits_flat_signal_at_session_exit() -> None:
+    strategy = DailyLondonTrendStrategy(
+        context_bars=context_bars(Side.BUY),
+        config=DailyLondonTrendConfig(context_ema_period=20, context_atr_period=14),
+    )
+
+    signals = strategy(
+        [bar(BASE_TIME.replace(hour=20), timeframe="5m", close=Decimal("130"))]
+    )
+
+    assert len(signals) == 1
+    assert signals[0].side == Side.FLAT
+    assert signals[0].reason == "daily_london_trend_session_exit"
