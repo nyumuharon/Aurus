@@ -5,11 +5,31 @@ from decimal import Decimal
 from pathlib import Path
 
 from aurus.backtest.run_real_baseline import (
+    current_best_real_backtest_config,
+    current_best_real_config,
     format_ingestion_report,
     format_real_baseline_summary,
     run_real_baseline_backtest,
 )
-from aurus.data import load_real_xauusd_5m_csv
+from aurus.data import TradingSession, load_real_xauusd_5m_csv
+
+
+def test_current_best_real_config_uses_profitable_reference_branch() -> None:
+    strategy_config = current_best_real_config()
+    backtest_config = current_best_real_backtest_config()
+
+    assert strategy_config.reward_risk == Decimal("1.10")
+    assert strategy_config.execution_ema_period == 5
+    assert strategy_config.min_atr_strength == Decimal("0.0005")
+    assert strategy_config.min_trend_strength == Decimal("0.0002")
+    assert strategy_config.min_pre_entry_extension_atr == Decimal("0.645")
+    assert strategy_config.allowed_sessions == frozenset({TradingSession.LONDON.value})
+    assert strategy_config.allowed_london_subwindows == frozenset({"open", "mid"})
+    assert backtest_config.stop_tightening_enabled is True
+    assert backtest_config.breakeven_trigger_r == Decimal("0.25")
+    assert backtest_config.breakeven_stop_r == Decimal("0.20")
+    assert backtest_config.trailing_trigger_r == Decimal("0.75")
+    assert backtest_config.trailing_stop_r == Decimal("0.50")
 
 
 def test_real_csv_ingestion_sorts_deduplicates_and_reports_missing_bars(tmp_path: Path) -> None:

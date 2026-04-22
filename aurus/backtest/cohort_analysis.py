@@ -98,20 +98,22 @@ class RecordingStrategy:
 
 
 def current_best_analysis_config() -> BaselineStrategyConfig:
-    """Return the current best baseline config without pullback-depth filtering."""
+    """Return the current best real-data baseline config for trade analysis."""
 
     return BaselineStrategyConfig(
-        reward_risk=Decimal("1.25"),
+        reward_risk=Decimal("1.10"),
         min_atr=Decimal("0.75"),
         min_atr_strength=Decimal("0.0005"),
         min_trend_strength=Decimal("0.0002"),
         min_pullback_depth_atr=Decimal("0"),
+        min_pre_entry_extension_atr=Decimal("0.645"),
         context_ema_period=3,
         execution_ema_period=5,
         max_spread=Decimal("0.50"),
         confirmation_mode="relaxed",
         entry_mode="baseline",
         allowed_sessions=frozenset({TradingSession.LONDON.value}),
+        allowed_london_subwindows=frozenset({"open", "mid"}),
     )
 
 
@@ -122,6 +124,7 @@ def current_best_backtest_config() -> BacktestConfig:
         record_events=False,
         stop_tightening_enabled=True,
         breakeven_trigger_r=Decimal("0.25"),
+        breakeven_stop_r=Decimal("0.20"),
         trailing_trigger_r=Decimal("0.75"),
         trailing_stop_r=Decimal("0.50"),
     )

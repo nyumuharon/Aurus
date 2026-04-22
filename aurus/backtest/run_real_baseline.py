@@ -18,13 +18,30 @@ def current_best_real_config() -> BaselineStrategyConfig:
     """Return the current best deterministic baseline config for external data checks."""
 
     return BaselineStrategyConfig(
+        reward_risk=Decimal("1.10"),
         confirmation_mode="relaxed",
         min_atr=Decimal("0.75"),
+        min_atr_strength=Decimal("0.0005"),
+        min_trend_strength=Decimal("0.0002"),
+        min_pre_entry_extension_atr=Decimal("0.645"),
         max_spread=Decimal("0.50"),
         context_ema_period=3,
-        execution_ema_period=3,
-        allowed_sessions=frozenset(session.value for session in TradingSession),
-        early_new_york_end_hour_utc=24,
+        execution_ema_period=5,
+        allowed_sessions=frozenset({TradingSession.LONDON.value}),
+        allowed_london_subwindows=frozenset({"open", "mid"}),
+    )
+
+
+def current_best_real_backtest_config() -> BacktestConfig:
+    """Return the current deterministic execution assumptions for real-data checks."""
+
+    return BacktestConfig(
+        record_events=False,
+        stop_tightening_enabled=True,
+        breakeven_trigger_r=Decimal("0.25"),
+        breakeven_stop_r=Decimal("0.20"),
+        trailing_trigger_r=Decimal("0.75"),
+        trailing_stop_r=Decimal("0.50"),
     )
 
 
@@ -40,7 +57,7 @@ def run_real_baseline_backtest(
     strategy = BaselineXauUsdStrategy(context_bars=data.context_bars, config=config)
     return BacktestEngine(
         strategy=strategy,
-        config=backtest_config or BacktestConfig(record_events=False),
+        config=backtest_config or current_best_real_backtest_config(),
     ).run(data.execution_bars)
 
 
