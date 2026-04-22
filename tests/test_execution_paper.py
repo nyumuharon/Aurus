@@ -2,11 +2,17 @@
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 from _pytest.logging import LogCaptureFixture
 from aurus.common.schemas import OrderIntent, OrderStatus, OrderType, Side
-from aurus.execution import InMemoryExecutionRepository, PaperExecutionAdapter, PaperExecutionConfig
+from aurus.execution import (
+    InMemoryExecutionRepository,
+    JsonlExecutionRepository,
+    PaperExecutionAdapter,
+    PaperExecutionConfig,
+)
 
 NOW = datetime(2026, 4, 21, 12, 0, tzinfo=UTC)
 
@@ -124,6 +130,18 @@ def test_reconciliation_hooks_restore_orders_fills_and_positions() -> None:
     first.submit_order(intent(quantity=Decimal("1")), client_order_key="key-1")
 
     restarted = PaperExecutionAdapter(repository=repository, clock=clock)
+
+    assert restarted.get_order("key-1") == first.get_order("key-1")
+    assert restarted.list_fills() == first.list_fills()
+    assert restarted.positions() == first.positions()
+
+
+def test_jsonl_execution_repository_restores_restart_state(tmp_path: Path) -> None:
+    repository = JsonlExecutionRepository(tmp_path)
+    first = PaperExecutionAdapter(repository=repository, clock=clock)
+    first.submit_order(intent(quantity=Decimal("1")), client_order_key="key-1")
+
+    restarted = PaperExecutionAdapter(repository=JsonlExecutionRepository(tmp_path), clock=clock)
 
     assert restarted.get_order("key-1") == first.get_order("key-1")
     assert restarted.list_fills() == first.list_fills()

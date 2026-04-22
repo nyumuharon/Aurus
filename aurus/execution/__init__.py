@@ -9,13 +9,14 @@ from aurus.execution.paper import (
     quantize_increment,
 )
 from aurus.execution.placeholder import COMPONENT
-from aurus.execution.repository import InMemoryExecutionRepository
+from aurus.execution.repository import InMemoryExecutionRepository, JsonlExecutionRepository
 
 __all__ = [
     "COMPONENT",
     "ExecutionAdapter",
     "ExecutionRepository",
     "InMemoryExecutionRepository",
+    "JsonlExecutionRepository",
     "PaperExecutionAdapter",
     "PaperExecutionConfig",
     "calculate_average_price",
