@@ -17,3 +17,6 @@ build/
 dist/
 *.egg-info/
 
+# Local historical market data caches
+data/raw/
+data/processed/
