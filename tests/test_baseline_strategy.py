@@ -178,6 +178,7 @@ def config(
     entry_mode: EntryMode = "baseline",
     min_pullback_depth_atr: Decimal = Decimal("0"),
     min_pre_entry_extension_atr: Decimal = Decimal("0"),
+    max_spread_to_risk: Decimal | None = None,
     continuation_pullback_tolerance: Decimal = Decimal("0.50"),
 ) -> BaselineStrategyConfig:
     return BaselineStrategyConfig(
@@ -205,6 +206,7 @@ def config(
         entry_mode=entry_mode,
         min_pullback_depth_atr=min_pullback_depth_atr,
         min_pre_entry_extension_atr=min_pre_entry_extension_atr,
+        max_spread_to_risk=max_spread_to_risk,
         continuation_pullback_tolerance=continuation_pullback_tolerance,
     )
 
@@ -586,6 +588,28 @@ def test_pre_entry_extension_is_recorded_on_signal() -> None:
     assert len(signals) == 1
     assert signals[0].features["min_pre_entry_extension_atr"] == "0.50"
     assert Decimal(str(signals[0].features["pre_entry_extension_atr"])) > Decimal("0.50")
+
+
+def test_blocked_signal_under_spread_to_risk_filter() -> None:
+    strategy = BaselineXauUsdStrategy(
+        context_bars=context_bars(Side.BUY),
+        config=config(max_spread_to_risk=Decimal("0.05")),
+    )
+
+    assert strategy(tuple(long_execution_bars(spread=Decimal("0.20")))) == []
+
+
+def test_spread_to_risk_is_recorded_on_signal() -> None:
+    strategy = BaselineXauUsdStrategy(
+        context_bars=context_bars(Side.BUY),
+        config=config(max_spread_to_risk=Decimal("0.20")),
+    )
+
+    signals = strategy(tuple(long_execution_bars(spread=Decimal("0.20"))))
+
+    assert len(signals) == 1
+    assert signals[0].features["max_spread_to_risk"] == "0.20"
+    assert Decimal(str(signals[0].features["spread_to_risk"])) <= Decimal("0.20")
 
 
 def test_trend_strength_is_recorded_on_signal() -> None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from bisect import bisect_right
 from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
@@ -44,6 +45,7 @@ class BaselineStrategyConfig:
     pullback_tolerance: Decimal = Decimal("0")
     min_pullback_depth_atr: Decimal = Decimal("0")
     min_pre_entry_extension_atr: Decimal = Decimal("0")
+    max_spread_to_risk: Decimal | None = None
     continuation_pullback_tolerance: Decimal = Decimal("0.50")
     atr_stop_floor_multiplier: Decimal = Decimal("1")
     reward_risk: Decimal = Decimal("2")
@@ -322,6 +324,7 @@ class BaselineXauUsdStrategy:
             [bar for bar in context_bars if self._is_context_bar(bar)],
             key=lambda bar: bar.timestamp,
         )
+        self._context_timestamps = [bar.timestamp for bar in self.context_bars]
         self._context_ema_values = ema(
             [bar.close for bar in self.context_bars],
             self.config.context_ema_period,
@@ -441,6 +444,19 @@ class BaselineXauUsdStrategy:
             atr_floor_multiplier=self.config.atr_stop_floor_multiplier,
             reward_risk=self.config.reward_risk,
         )
+        if not _passes_spread_to_risk_filter(
+            spread=current.spread,
+            risk_per_unit=stop_target.risk_per_unit,
+            config=self.config,
+        ):
+            self._log_block(
+                current,
+                "spread_to_risk_above_threshold",
+                spread="missing" if current.spread is None else str(current.spread),
+                risk_per_unit=str(stop_target.risk_per_unit),
+                max_spread_to_risk=str(self.config.max_spread_to_risk),
+            )
+            return []
         signal = SignalEvent(
             timestamp=current.timestamp,
             correlation_id=f"baseline-{current.correlation_id}",
@@ -477,6 +493,17 @@ class BaselineXauUsdStrategy:
                 "pre_entry_extension_atr": str(pre_entry_extension_atr),
                 "min_pre_entry_extension_atr": str(
                     self.config.min_pre_entry_extension_atr
+                ),
+                "spread_to_risk": str(
+                    _spread_to_risk(
+                        spread=current.spread,
+                        risk_per_unit=stop_target.risk_per_unit,
+                    )
+                ),
+                "max_spread_to_risk": (
+                    None
+                    if self.config.max_spread_to_risk is None
+                    else str(self.config.max_spread_to_risk)
                 ),
                 "stop_loss": str(stop_target.stop_loss),
                 "take_profit": str(stop_target.take_profit),
@@ -528,11 +555,7 @@ class BaselineXauUsdStrategy:
         )
 
     def _context_until(self, bar: BarEvent) -> list[BarEvent]:
-        return [
-            context_bar
-            for context_bar in self.context_bars
-            if context_bar.timestamp <= bar.timestamp
-        ]
+        return self.context_bars[: bisect_right(self._context_timestamps, bar.timestamp)]
 
     def _trend(self, context: list[BarEvent]) -> Side | None:
         if len(context) < self.config.context_ema_period + 1:
@@ -815,6 +838,26 @@ def _passes_pre_entry_extension_filter(
     if config.min_pre_entry_extension_atr <= Decimal("0"):
         return True
     return pre_entry_extension_atr > config.min_pre_entry_extension_atr
+
+
+def _passes_spread_to_risk_filter(
+    *,
+    spread: Decimal | None,
+    risk_per_unit: Decimal,
+    config: BaselineStrategyConfig,
+) -> bool:
+    if config.max_spread_to_risk is None:
+        return True
+    return (
+        _spread_to_risk(spread=spread, risk_per_unit=risk_per_unit)
+        <= config.max_spread_to_risk
+    )
+
+
+def _spread_to_risk(*, spread: Decimal | None, risk_per_unit: Decimal) -> Decimal:
+    if spread is None or risk_per_unit <= Decimal("0"):
+        return Decimal("Infinity")
+    return spread / risk_per_unit
 
 
 def _has_confirmation(

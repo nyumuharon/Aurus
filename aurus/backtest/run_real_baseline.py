@@ -24,6 +24,7 @@ def current_best_real_config() -> BaselineStrategyConfig:
         min_atr_strength=Decimal("0.0005"),
         min_trend_strength=Decimal("0.0002"),
         min_pre_entry_extension_atr=Decimal("0.645"),
+        max_spread_to_risk=Decimal("0.055"),
         max_spread=Decimal("0.50"),
         context_ema_period=3,
         execution_ema_period=5,

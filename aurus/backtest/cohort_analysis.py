@@ -107,6 +107,7 @@ def current_best_analysis_config() -> BaselineStrategyConfig:
         min_trend_strength=Decimal("0.0002"),
         min_pullback_depth_atr=Decimal("0"),
         min_pre_entry_extension_atr=Decimal("0.645"),
+        max_spread_to_risk=Decimal("0.055"),
         context_ema_period=3,
         execution_ema_period=5,
         max_spread=Decimal("0.50"),

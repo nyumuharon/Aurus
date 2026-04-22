@@ -23,6 +23,7 @@ def test_current_best_real_config_uses_profitable_reference_branch() -> None:
     assert strategy_config.min_atr_strength == Decimal("0.0005")
     assert strategy_config.min_trend_strength == Decimal("0.0002")
     assert strategy_config.min_pre_entry_extension_atr == Decimal("0.645")
+    assert strategy_config.max_spread_to_risk == Decimal("0.055")
     assert strategy_config.allowed_sessions == frozenset({TradingSession.LONDON.value})
     assert strategy_config.allowed_london_subwindows == frozenset({"open", "mid"})
     assert backtest_config.stop_tightening_enabled is True
