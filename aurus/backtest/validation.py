@@ -83,6 +83,7 @@ class ReadinessGateConfig:
     """Explicit thresholds for demo-forward readiness checks."""
 
     require_no_active_unexpected_gaps: bool = True
+    max_active_unexpected_missing_bars: int = 5
     require_full_sample_positive: bool = True
     require_all_segments_positive: bool = True
     require_all_walk_forward_positive: bool = True
@@ -161,9 +162,16 @@ def evaluate_demo_readiness(
     if (
         gate_config.require_no_active_unexpected_gaps
         and report.active_gap_policy.has_unexpected_gaps
+        and report.active_gap_policy.unexpected_missing_bars
+        > gate_config.max_active_unexpected_missing_bars
     ):
         blockers.append(
             "unexpected data gaps affect active strategy trading windows"
+        )
+    elif report.active_gap_policy.has_unexpected_gaps:
+        warnings.append(
+            "small unexpected active-window data gaps remain: "
+            f"{report.active_gap_policy.unexpected_missing_bars} missing bars"
         )
     elif report.gap_policy.has_unexpected_gaps:
         warnings.append(

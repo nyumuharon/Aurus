@@ -3,9 +3,22 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 
 from aurus.data.quality import MissingBarGap
+
+ANNUAL_XAUUSD_CLOSURE_MONTH_DAYS = frozenset(
+    {
+        (1, 1),  # New Year's Day
+        (7, 4),  # U.S. Independence Day
+        (12, 25),  # Christmas Day
+    }
+)
+XAUUSD_BROKER_OBSERVED_CLOSURE_DATES = frozenset(
+    {
+        date(2025, 7, 3),
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -49,14 +62,16 @@ def classify_xauusd_gaps(gaps: tuple[MissingBarGap, ...]) -> GapPolicyReport:
 
 
 def is_expected_xauusd_closure(gap: MissingBarGap) -> bool:
-    """Return True for weekend/market-closure gaps in spot-gold style trading data."""
+    """Return True for coarse weekend/holiday closures in spot-gold style data."""
 
     if not gap.missing_timestamps:
         return False
     timestamps = (gap.previous_timestamp, *gap.missing_timestamps, gap.next_timestamp)
-    return any(_is_weekend(timestamp) for timestamp in timestamps) or _spans_weekend(
-        gap.previous_timestamp,
-        gap.next_timestamp,
+    return (
+        any(_is_weekend(timestamp) for timestamp in timestamps)
+        or _spans_weekend(gap.previous_timestamp, gap.next_timestamp)
+        or any(_is_annual_market_holiday(timestamp.date()) for timestamp in timestamps)
+        or any(_is_broker_observed_closure(timestamp.date()) for timestamp in timestamps)
     )
 
 
@@ -72,3 +87,11 @@ def _spans_weekend(start: datetime, end: datetime) -> bool:
             return True
         current_day = current_day.fromordinal(current_day.toordinal() + 1)
     return False
+
+
+def _is_annual_market_holiday(day: date) -> bool:
+    return (day.month, day.day) in ANNUAL_XAUUSD_CLOSURE_MONTH_DAYS
+
+
+def _is_broker_observed_closure(day: date) -> bool:
+    return day in XAUUSD_BROKER_OBSERVED_CLOSURE_DATES

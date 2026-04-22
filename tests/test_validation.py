@@ -96,6 +96,41 @@ def test_gap_policy_separates_weekend_and_unexpected_gaps() -> None:
     assert report.has_unexpected_gaps is True
 
 
+def test_gap_policy_treats_major_market_holidays_as_expected() -> None:
+    christmas_gap = MissingBarGap(
+        previous_timestamp=datetime(2025, 12, 24, 20, 40, tzinfo=UTC),
+        next_timestamp=datetime(2025, 12, 26, 1, 0, tzinfo=UTC),
+        missing_timestamps=(datetime(2025, 12, 25, 10, 0, tzinfo=UTC),),
+    )
+    new_year_gap = MissingBarGap(
+        previous_timestamp=datetime(2025, 12, 31, 23, 55, tzinfo=UTC),
+        next_timestamp=datetime(2026, 1, 2, 1, 0, tzinfo=UTC),
+        missing_timestamps=(datetime(2026, 1, 1, 10, 0, tzinfo=UTC),),
+    )
+    independence_day_gap = MissingBarGap(
+        previous_timestamp=datetime(2025, 7, 4, 4, 0, tzinfo=UTC),
+        next_timestamp=datetime(2025, 7, 4, 10, 25, tzinfo=UTC),
+        missing_timestamps=(datetime(2025, 7, 4, 7, 0, tzinfo=UTC),),
+    )
+    broker_observed_independence_gap = MissingBarGap(
+        previous_timestamp=datetime(2025, 7, 3, 3, 0, tzinfo=UTC),
+        next_timestamp=datetime(2025, 7, 3, 12, 10, tzinfo=UTC),
+        missing_timestamps=(datetime(2025, 7, 3, 7, 0, tzinfo=UTC),),
+    )
+
+    report = classify_xauusd_gaps(
+        (
+            christmas_gap,
+            new_year_gap,
+            independence_day_gap,
+            broker_observed_independence_gap,
+        )
+    )
+
+    assert report.expected_closure_gaps == 4
+    assert report.unexpected_gaps == 0
+
+
 def validation_metrics(label: str = "sample") -> ValidationMetrics:
     return ValidationMetrics(
         label=label,
@@ -181,12 +216,20 @@ def test_readiness_passes_when_validation_is_clean() -> None:
 
 def test_readiness_blocks_unexpected_gaps_and_failed_segments() -> None:
     decision = evaluate_demo_readiness(
-        readiness_report(gap_report_unexpected=True, failed_segment=True)
+        readiness_report(gap_report_unexpected=True, failed_segment=True),
+        config=ReadinessGateConfig(max_active_unexpected_missing_bars=0),
     )
 
     assert decision.ready is False
     assert any("unexpected data gaps affect" in blocker for blocker in decision.blockers)
     assert any("chronological segment failure" in blocker for blocker in decision.blockers)
+
+
+def test_readiness_warns_for_small_active_gap_tolerance() -> None:
+    decision = evaluate_demo_readiness(readiness_report(gap_report_unexpected=True))
+
+    assert decision.ready is True
+    assert any("small unexpected active-window" in warning for warning in decision.warnings)
 
 
 def test_readiness_warns_for_small_spread_breach_rate() -> None:
