@@ -21,7 +21,7 @@ def current_daily_trend_config() -> DailyLondonTrendConfig:
         context_ema_period=20,
         context_atr_period=14,
         windows=(
-            DailyTrendWindow(label="london_full", entry_hour_utc=7, exit_hour_utc=20),
+            DailyTrendWindow(label="pre_london_full", entry_hour_utc=6, exit_hour_utc=20),
         ),
         atr_stop_multiplier=Decimal("3"),
         reward_risk=Decimal("2.5"),

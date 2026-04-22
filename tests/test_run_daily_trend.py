@@ -14,8 +14,8 @@ def test_current_daily_trend_config_uses_daily_research_defaults() -> None:
 
     assert config.context_ema_period == 20
     assert config.context_atr_period == 14
-    assert tuple(window.label for window in config.windows) == ("london_full",)
-    assert config.windows[0].entry_hour_utc == 7
+    assert tuple(window.label for window in config.windows) == ("pre_london_full",)
+    assert config.windows[0].entry_hour_utc == 6
     assert config.windows[0].exit_hour_utc == 20
     assert config.atr_stop_multiplier == Decimal("3")
     assert config.reward_risk == Decimal("2.5")
