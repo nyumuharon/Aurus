@@ -10,7 +10,11 @@ from aurus.strategy.baseline import (
     StopTarget,
     calculate_stop_target,
 )
-from aurus.strategy.daily_trend import DailyLondonTrendConfig, DailyLondonTrendStrategy
+from aurus.strategy.daily_trend import (
+    DailyLondonTrendConfig,
+    DailyLondonTrendStrategy,
+    DailyTrendWindow,
+)
 from aurus.strategy.indicators import atr, ema, true_ranges
 from aurus.strategy.placeholder import COMPONENT
 
@@ -22,6 +26,7 @@ __all__ = [
     "ConfirmationMode",
     "DailyLondonTrendConfig",
     "DailyLondonTrendStrategy",
+    "DailyTrendWindow",
     "EntryMode",
     "LondonSubwindow",
     "StopTarget",

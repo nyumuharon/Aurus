@@ -11,7 +11,7 @@ from aurus.backtest.types import BacktestConfig, BacktestResult
 from aurus.data import IngestedMarketData, load_real_xauusd_5m_csv
 from aurus.ops.metrics import calculate_metrics
 from aurus.ops.summary import format_decimal
-from aurus.strategy import DailyLondonTrendConfig, DailyLondonTrendStrategy
+from aurus.strategy import DailyLondonTrendConfig, DailyLondonTrendStrategy, DailyTrendWindow
 
 
 def current_daily_trend_config() -> DailyLondonTrendConfig:
@@ -20,10 +20,11 @@ def current_daily_trend_config() -> DailyLondonTrendConfig:
     return DailyLondonTrendConfig(
         context_ema_period=20,
         context_atr_period=14,
-        entry_hour_utc=7,
-        entry_minute_utc=0,
+        windows=(
+            DailyTrendWindow(label="london_full", entry_hour_utc=7, exit_hour_utc=20),
+        ),
         atr_stop_multiplier=Decimal("3"),
-        reward_risk=Decimal("1.5"),
+        reward_risk=Decimal("2.5"),
     )
 
 

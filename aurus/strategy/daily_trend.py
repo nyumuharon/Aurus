@@ -14,18 +14,28 @@ DAILY_TREND_SOURCE = SourceMetadata(name="daily-london-trend-v1", kind="strategy
 
 
 @dataclass(frozen=True)
+class DailyTrendWindow:
+    """Scheduled intraday trend window."""
+
+    label: str
+    entry_hour_utc: int
+    exit_hour_utc: int
+    entry_minute_utc: int = 0
+    exit_minute_utc: int = 0
+
+
+@dataclass(frozen=True)
 class DailyLondonTrendConfig:
-    """Configuration for one-trade-per-day London trend continuation."""
+    """Configuration for scheduled intraday trend continuation."""
 
     instrument: str = "XAU/USD"
     execution_timeframe: str = "5m"
     context_timeframe: str = "1h"
     context_ema_period: int = 20
     context_atr_period: int = 14
-    entry_hour_utc: int = 7
-    entry_minute_utc: int = 0
-    exit_hour_utc: int = 20
-    exit_minute_utc: int = 0
+    windows: tuple[DailyTrendWindow, ...] = (
+        DailyTrendWindow(label="london", entry_hour_utc=7, exit_hour_utc=20),
+    )
     atr_stop_multiplier: Decimal = Decimal("3")
     reward_risk: Decimal = Decimal("1.5")
     quantity: Decimal = Decimal("1")
@@ -59,29 +69,30 @@ class DailyLondonTrendStrategy:
         current = bars[-1]
         if not self._is_execution_bar(current):
             return []
-        if (
-            current.timestamp.hour == self.config.exit_hour_utc
-            and current.timestamp.minute == self.config.exit_minute_utc
-        ):
+        exit_window = self._exit_window(current)
+        if exit_window is not None:
             return [
                 SignalEvent(
                     timestamp=current.timestamp,
                     correlation_id=f"daily-trend-exit-{current.correlation_id}",
                     source=DAILY_TREND_SOURCE,
-                    signal_id=f"daily-trend-exit-{current.timestamp.isoformat()}",
+                    signal_id=(
+                        f"daily-trend-exit-{exit_window.label}-{current.timestamp.isoformat()}"
+                    ),
                     strategy_id="daily-london-trend-v1",
                     instrument=current.instrument,
                     side=Side.FLAT,
                     strength=Decimal("0"),
                     reason="daily_london_trend_session_exit",
-                    features={"quantity": str(self.config.quantity)},
+                    features={
+                        "quantity": str(self.config.quantity),
+                        "window_label": exit_window.label,
+                    },
                 )
             ]
 
-        if (
-            current.timestamp.hour != self.config.entry_hour_utc
-            or current.timestamp.minute != self.config.entry_minute_utc
-        ):
+        entry_window = self._entry_window(current)
+        if entry_window is None:
             return []
 
         context_index = bisect_right(self._context_timestamps, current.timestamp) - 1
@@ -127,6 +138,9 @@ class DailyLondonTrendStrategy:
                     "risk_per_unit": str(risk_per_unit),
                     "reward_risk": str(self.config.reward_risk),
                     "quantity": str(self.config.quantity),
+                    "window_label": entry_window.label,
+                    "window_entry_hour_utc": entry_window.entry_hour_utc,
+                    "window_exit_hour_utc": entry_window.exit_hour_utc,
                 },
             )
         ]
@@ -142,6 +156,24 @@ class DailyLondonTrendStrategy:
             bar.instrument == self.config.instrument
             and bar.timeframe == self.config.context_timeframe
         )
+
+    def _entry_window(self, bar: BarEvent) -> DailyTrendWindow | None:
+        for window in self.config.windows:
+            if (
+                bar.timestamp.hour == window.entry_hour_utc
+                and bar.timestamp.minute == window.entry_minute_utc
+            ):
+                return window
+        return None
+
+    def _exit_window(self, bar: BarEvent) -> DailyTrendWindow | None:
+        for window in self.config.windows:
+            if (
+                bar.timestamp.hour == window.exit_hour_utc
+                and bar.timestamp.minute == window.exit_minute_utc
+            ):
+                return window
+        return None
 
 
 def trend_side(*, context_bar: BarEvent, ema_value: Decimal) -> Side | None:
