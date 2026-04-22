@@ -444,7 +444,7 @@ def _tightened_buy_stop(
 ) -> Decimal | None:
     candidate = current_stop
     if favorable_excursion >= risk * config.breakeven_trigger_r:
-        candidate = _max_decimal(candidate, entry_price)
+        candidate = _max_decimal(candidate, entry_price + (risk * config.breakeven_stop_r))
     if favorable_excursion >= risk * config.trailing_trigger_r:
         candidate = _max_decimal(candidate, entry_price + (risk * config.trailing_stop_r))
     return candidate
@@ -460,7 +460,7 @@ def _tightened_sell_stop(
 ) -> Decimal | None:
     candidate = current_stop
     if favorable_excursion >= risk * config.breakeven_trigger_r:
-        candidate = _min_decimal(candidate, entry_price)
+        candidate = _min_decimal(candidate, entry_price - (risk * config.breakeven_stop_r))
     if favorable_excursion >= risk * config.trailing_trigger_r:
         candidate = _min_decimal(candidate, entry_price - (risk * config.trailing_stop_r))
     return candidate

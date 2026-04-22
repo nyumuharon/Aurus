@@ -116,6 +116,33 @@ def test_stop_tightening_moves_to_breakeven_after_half_r() -> None:
     assert result.trades[0].net_pnl == Decimal("0")
 
 
+def test_stop_tightening_can_lock_profit_after_breakeven_trigger() -> None:
+    def strategy(bars: Sequence[BarEvent]) -> list[SignalEvent]:
+        if len(bars) == 1:
+            return [buy_signal(bars[-1], quantity="1", stop_loss="95", take_profit="120")]
+        return []
+
+    result = BacktestEngine(
+        strategy=strategy,
+        config=BacktestConfig(
+            stop_tightening_enabled=True,
+            breakeven_trigger_r=Decimal("0.5"),
+            breakeven_stop_r=Decimal("0.1"),
+        ),
+    ).run(
+        [
+            bar(0, close="100"),
+            bar(1, close="102", high="102.5", low="100.5"),
+            bar(2, close="100", high="101", low="99.5"),
+        ]
+    )
+
+    assert len(result.trades) == 1
+    assert result.trades[0].exit_reason == "stop_loss"
+    assert result.trades[0].exit_price == Decimal("100.5")
+    assert result.trades[0].net_pnl == Decimal("0.5")
+
+
 def test_stop_tightening_trails_to_quarter_r_after_one_r() -> None:
     def strategy(bars: Sequence[BarEvent]) -> list[SignalEvent]:
         if len(bars) == 1:

@@ -34,6 +34,7 @@ class BacktestConfig:
     record_events: bool = True
     stop_tightening_enabled: bool = False
     breakeven_trigger_r: Decimal = Decimal("0.5")
+    breakeven_stop_r: Decimal = Decimal("0")
     trailing_trigger_r: Decimal = Decimal("1.0")
     trailing_stop_r: Decimal = Decimal("0.25")
 
