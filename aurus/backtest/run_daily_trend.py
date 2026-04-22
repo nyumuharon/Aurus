@@ -17,7 +17,7 @@ from aurus.ops.summary import format_decimal
 from aurus.strategy import DailyLondonTrendConfig, DailyLondonTrendStrategy, DailyTrendWindow
 
 
-def current_daily_trend_config() -> DailyLondonTrendConfig:
+def current_daily_trend_config(*, quantity: Decimal = Decimal("1")) -> DailyLondonTrendConfig:
     """Return the current daily-trading research configuration."""
 
     return DailyLondonTrendConfig(
@@ -26,6 +26,7 @@ def current_daily_trend_config() -> DailyLondonTrendConfig:
         windows=(DailyTrendWindow(label="pre_london_full", entry_hour_utc=6, exit_hour_utc=21),),
         atr_stop_multiplier=Decimal("3"),
         reward_risk=Decimal("2.5"),
+        quantity=quantity,
     )
 
 
@@ -70,13 +71,20 @@ def format_daily_trend_summary(
         f"profit factor: {format_decimal(metrics.profit_factor)}",
         f"max drawdown: {metrics.max_drawdown}",
         f"net PnL: {metrics.total_pnl}",
+        f"net return: {format_return_pct(metrics.total_pnl, starting_equity)}",
+        f"max drawdown return: {format_return_pct(metrics.max_drawdown, starting_equity)}",
         f"starting equity: {starting_equity}",
         "yearly PnL:",
     ]
     lines.extend(format_yearly_pnl(annual_pnl, starting_equity=starting_equity))
     if latest_year is not None:
         lines.append(f"{latest_year} monthly PnL:")
-        lines.extend(format_monthly_pnl(realized_pnl_by_month(result, year=latest_year)))
+        lines.extend(
+            format_monthly_pnl(
+                realized_pnl_by_month(result, year=latest_year),
+                starting_equity=starting_equity,
+            )
+        )
     return "\n".join(lines)
 
 
@@ -119,16 +127,37 @@ def format_yearly_pnl(
     rows: list[str] = []
     for year, pnl in pnl_by_year.items():
         ending_equity += pnl
-        rows.append(f"{year}: PnL {pnl}, ending equity {ending_equity}")
+        rows.append(
+            f"{year}: PnL {pnl}, return {format_return_pct(pnl, starting_equity)}, "
+            f"ending equity {ending_equity}"
+        )
     return rows
 
 
-def format_monthly_pnl(pnl_by_month: Mapping[datetime, Decimal]) -> list[str]:
+def format_monthly_pnl(
+    pnl_by_month: Mapping[datetime, Decimal],
+    *,
+    starting_equity: Decimal = Decimal("10000"),
+) -> list[str]:
     """Render monthly PnL rows."""
 
     if not pnl_by_month:
         return ["none"]
-    return [f"{month.year}-{month.month:02d}: PnL {pnl}" for month, pnl in pnl_by_month.items()]
+    return [
+        (
+            f"{month.year}-{month.month:02d}: PnL {pnl}, "
+            f"return {format_return_pct(pnl, starting_equity)}"
+        )
+        for month, pnl in pnl_by_month.items()
+    ]
+
+
+def format_return_pct(value: Decimal, base: Decimal) -> str:
+    """Render a return percentage using the supplied account base."""
+
+    if base == Decimal("0"):
+        return "n/a"
+    return f"{format_decimal((value / base) * Decimal('100'))}%"
 
 
 def parse_args() -> argparse.Namespace:
@@ -142,6 +171,12 @@ def parse_args() -> argparse.Namespace:
         type=Decimal,
         help="Starting equity for yearly/monthly reporting.",
     )
+    parser.add_argument(
+        "--quantity",
+        default=Decimal("1"),
+        type=Decimal,
+        help="Fixed strategy quantity for sizing what-if reporting.",
+    )
     return parser.parse_args()
 
 
@@ -150,7 +185,10 @@ def main() -> None:
 
     args = parse_args()
     data = load_real_xauusd_5m_csv(args.data)
-    result = run_daily_trend_backtest(data=data)
+    result = run_daily_trend_backtest(
+        data=data,
+        strategy_config=current_daily_trend_config(quantity=args.quantity),
+    )
     print(format_daily_trend_summary(result, starting_equity=args.starting_equity))
 
 

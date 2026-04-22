@@ -24,7 +24,14 @@ def test_current_daily_trend_config_uses_daily_research_defaults() -> None:
     assert config.windows[0].exit_hour_utc == 21
     assert config.atr_stop_multiplier == Decimal("3")
     assert config.reward_risk == Decimal("2.5")
+    assert config.quantity == Decimal("1")
     assert backtest_config.stop_tightening_enabled is False
+
+
+def test_current_daily_trend_config_accepts_quantity_override() -> None:
+    config = current_daily_trend_config(quantity=Decimal("2.5"))
+
+    assert config.quantity == Decimal("2.5")
 
 
 def test_daily_trend_summary_includes_yearly_and_latest_year_monthly_output() -> None:
@@ -42,12 +49,13 @@ def test_daily_trend_summary_includes_yearly_and_latest_year_monthly_output() ->
     summary = format_daily_trend_summary(result, starting_equity=Decimal("10000"))
 
     assert "starting equity: 10000" in summary
+    assert "net return: 0.3100%" in summary
     assert "yearly PnL:" in summary
-    assert "2025: PnL 25, ending equity 10025" in summary
-    assert "2026: PnL 6, ending equity 10031" in summary
+    assert "2025: PnL 25, return 0.2500%, ending equity 10025" in summary
+    assert "2026: PnL 6, return 0.0600%, ending equity 10031" in summary
     assert "2026 monthly PnL:" in summary
-    assert "2026-01: PnL 10" in summary
-    assert "2026-02: PnL -4" in summary
+    assert "2026-01: PnL 10, return 0.100%" in summary
+    assert "2026-02: PnL -4, return -0.0400%" in summary
 
 
 def test_daily_trend_pnl_formatters_handle_empty_results() -> None:
