@@ -27,7 +27,8 @@ wine "/home/v3ct0r7/.wine/drive_c/Program Files/MetaTrader 5/terminal64.exe" \
 python -m aurus.ops.run_demo_workflow \
   --data /home/v3ct0r7/xauusd_m5.csv \
   --artifact-dir artifacts/demo-workflow \
-  --paper-state-dir artifacts/demo-paper-forward
+  --paper-state-dir artifacts/demo-paper-forward \
+  --fail-on-not-ready
 ```
 
 The individual commands remain available for debugging:

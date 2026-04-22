@@ -173,6 +173,12 @@ def format_demo_workflow_result(result: DemoWorkflowResult) -> str:
     )
 
 
+def readiness_exit_code(result: DemoWorkflowResult) -> int:
+    """Return process-style status for automation."""
+
+    return 0 if evaluate_demo_readiness(result.validation).ready else 2
+
+
 def parse_args() -> argparse.Namespace:
     """Parse CLI arguments."""
 
@@ -196,6 +202,11 @@ def parse_args() -> argparse.Namespace:
         type=int,
         help="Non-overlapping walk-forward window size.",
     )
+    parser.add_argument(
+        "--fail-on-not-ready",
+        action="store_true",
+        help="Exit with status 2 when readiness gates fail.",
+    )
     return parser.parse_args()
 
 
@@ -210,6 +221,8 @@ def main() -> None:
         walk_forward_days=args.walk_forward_days,
     )
     print(format_demo_workflow_result(result))
+    if args.fail_on_not_ready and readiness_exit_code(result) != 0:
+        raise SystemExit(readiness_exit_code(result))
 
 
 def _format_items(items: tuple[str, ...]) -> str:

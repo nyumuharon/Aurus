@@ -15,6 +15,7 @@ from aurus.ops.run_demo_workflow import (
     DemoWorkflowPaths,
     DemoWorkflowResult,
     format_demo_workflow_result,
+    readiness_exit_code,
     workflow_manifest,
     write_manifest,
 )
@@ -107,3 +108,7 @@ def test_format_demo_workflow_result_includes_manifest_path(tmp_path: Path) -> N
 
     assert "ready: True" in summary
     assert f"manifest: {result.paths.manifest_json}" in summary
+
+
+def test_readiness_exit_code_is_zero_when_ready(tmp_path: Path) -> None:
+    assert readiness_exit_code(workflow_result(tmp_path)) == 0
