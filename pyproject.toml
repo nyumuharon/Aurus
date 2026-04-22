@@ -20,6 +20,7 @@ aurus-baseline-backtest = "aurus.backtest.run_baseline:main"
 aurus-baseline-sweep = "aurus.backtest.sweep_baseline:main"
 aurus-baseline-stress = "aurus.backtest.stress_baseline:main"
 aurus-real-baseline = "aurus.backtest.run_real_baseline:main"
+aurus-real-validate = "aurus.backtest.validate_real_baseline:main"
 aurus-mt5-export = "aurus.data.mt5_export:main"
 
 [project.optional-dependencies]
