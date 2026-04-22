@@ -14,7 +14,8 @@ claiming live profitability from historical backtests.
 1. Export the latest MT5 M5 bars.
 2. Run the real baseline backtest.
 3. Run real validation.
-4. Save artifacts before changing strategy logic.
+4. Run one paper-forward decision cycle from the latest closed bar.
+5. Save artifacts before changing strategy logic.
 
 Commands:
 
@@ -26,7 +27,15 @@ python -m aurus.backtest.run_real_baseline --data /home/v3ct0r7/xauusd_m5.csv
 python -m aurus.backtest.validate_real_baseline \
   --data /home/v3ct0r7/xauusd_m5.csv \
   --output artifacts/real-baseline-validation.csv
+python -m aurus.execution.run_paper_forward \
+  --data /home/v3ct0r7/xauusd_m5.csv \
+  --state-dir artifacts/demo-paper-forward
 ```
+
+The paper-forward runner is broker-neutral. It evaluates the latest closed CSV bar only,
+routes any signal through the pure risk kernel, submits approved orders to the paper
+adapter with an idempotent client order key, and appends decisions to
+`artifacts/demo-paper-forward/journal/paper-forward.jsonl`.
 
 ## Minimum Evidence Before Live Use
 
