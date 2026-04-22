@@ -12,6 +12,8 @@ from aurus.backtest.types import BacktestConfig
 from aurus.common.schemas import BarEvent
 from aurus.data import IngestedMarketData, aggregate_closed_hourly_bars, classify_xauusd_gaps
 from aurus.data.gap_policy import GapPolicyReport
+from aurus.data.quality import MissingBarGap
+from aurus.data.sessions import TradingSession, tag_session
 from aurus.ops.metrics import calculate_metrics
 from aurus.strategy import BaselineStrategyConfig, BaselineXauUsdStrategy
 
@@ -73,13 +75,14 @@ class RealDataValidationReport:
     walk_forward: tuple[ValidationMetrics, ...]
     spread_costs: SpreadCostReport
     gap_policy: GapPolicyReport
+    active_gap_policy: GapPolicyReport
 
 
 @dataclass(frozen=True)
 class ReadinessGateConfig:
     """Explicit thresholds for demo-forward readiness checks."""
 
-    require_no_unexpected_gaps: bool = True
+    require_no_active_unexpected_gaps: bool = True
     require_full_sample_positive: bool = True
     require_all_segments_positive: bool = True
     require_all_walk_forward_positive: bool = True
@@ -138,6 +141,9 @@ def run_real_data_validation(
             backtest_config=backtest_config,
         ),
         gap_policy=classify_xauusd_gaps(data.report.missing_gaps),
+        active_gap_policy=classify_xauusd_gaps(
+            active_strategy_gaps(data.report.missing_gaps, strategy_config)
+        ),
     )
 
 
@@ -153,11 +159,16 @@ def evaluate_demo_readiness(
     warnings: list[str] = []
 
     if (
-        gate_config.require_no_unexpected_gaps
-        and report.gap_policy.has_unexpected_gaps
+        gate_config.require_no_active_unexpected_gaps
+        and report.active_gap_policy.has_unexpected_gaps
     ):
         blockers.append(
-            "unexpected data gaps remain outside the coarse XAU/USD closure policy"
+            "unexpected data gaps affect active strategy trading windows"
+        )
+    elif report.gap_policy.has_unexpected_gaps:
+        warnings.append(
+            "unexpected data gaps exist outside active strategy trading windows: "
+            f"{report.gap_policy.unexpected_gaps}"
         )
 
     if gate_config.require_full_sample_positive and not _positive_sample(report.full_sample):
@@ -311,6 +322,22 @@ def spread_cost_report(
     )
 
 
+def active_strategy_gaps(
+    gaps: Sequence[MissingBarGap],
+    strategy_config: BaselineStrategyConfig,
+) -> tuple[MissingBarGap, ...]:
+    """Return gaps with missing timestamps inside the strategy's active windows."""
+
+    return tuple(
+        gap
+        for gap in gaps
+        if any(
+            _is_active_strategy_timestamp(timestamp, strategy_config)
+            for timestamp in gap.missing_timestamps
+        )
+    )
+
+
 def _window_from_bars(label: str, bars: Sequence[BarEvent]) -> ValidationWindow:
     ordered = tuple(sorted(bars, key=lambda bar: bar.timestamp))
     return ValidationWindow(
@@ -334,3 +361,27 @@ def _positive_sample(row: ValidationMetrics) -> bool:
         and row.profit_factor is not None
         and row.profit_factor > Decimal("1")
     )
+
+
+def _is_active_strategy_timestamp(
+    timestamp: datetime,
+    strategy_config: BaselineStrategyConfig,
+) -> bool:
+    session = tag_session(timestamp)
+    if session.value not in strategy_config.allowed_sessions:
+        return False
+    if session == TradingSession.LONDON:
+        return _london_subwindow(timestamp) in strategy_config.allowed_london_subwindows
+    if session == TradingSession.NEW_YORK:
+        return timestamp.hour < strategy_config.early_new_york_end_hour_utc
+    return True
+
+
+def _london_subwindow(timestamp: datetime) -> str:
+    if 7 <= timestamp.hour < 9:
+        return "open"
+    if 9 <= timestamp.hour < 11:
+        return "mid"
+    if 11 <= timestamp.hour < 13:
+        return "late"
+    return "outside_london"

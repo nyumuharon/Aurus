@@ -9,6 +9,7 @@ from aurus.backtest.validation import (
     RealDataValidationReport,
     SpreadCostReport,
     ValidationMetrics,
+    active_strategy_gaps,
     chronological_segments,
     evaluate_demo_readiness,
     rolling_windows,
@@ -156,6 +157,17 @@ def readiness_report(
             if gap_report_unexpected
             else ()
         ),
+        active_gap_policy=classify_xauusd_gaps(
+            (
+                MissingBarGap(
+                    previous_timestamp=NOW,
+                    next_timestamp=NOW + timedelta(minutes=10),
+                    missing_timestamps=(NOW + timedelta(minutes=5),),
+                ),
+            )
+            if gap_report_unexpected
+            else ()
+        ),
     )
 
 
@@ -173,7 +185,7 @@ def test_readiness_blocks_unexpected_gaps_and_failed_segments() -> None:
     )
 
     assert decision.ready is False
-    assert any("unexpected data gaps" in blocker for blocker in decision.blockers)
+    assert any("unexpected data gaps affect" in blocker for blocker in decision.blockers)
     assert any("chronological segment failure" in blocker for blocker in decision.blockers)
 
 
@@ -192,3 +204,26 @@ def test_readiness_blocks_large_spread_breach_rate() -> None:
 
     assert decision.ready is False
     assert any("spread breach rate exceeds" in blocker for blocker in decision.blockers)
+
+
+def test_active_strategy_gaps_filters_to_london_open_mid() -> None:
+    active_gap = MissingBarGap(
+        previous_timestamp=datetime(2026, 4, 20, 7, 0, tzinfo=UTC),
+        next_timestamp=datetime(2026, 4, 20, 7, 10, tzinfo=UTC),
+        missing_timestamps=(datetime(2026, 4, 20, 7, 5, tzinfo=UTC),),
+    )
+    inactive_gap = MissingBarGap(
+        previous_timestamp=datetime(2026, 4, 20, 12, 0, tzinfo=UTC),
+        next_timestamp=datetime(2026, 4, 20, 12, 10, tzinfo=UTC),
+        missing_timestamps=(datetime(2026, 4, 20, 12, 5, tzinfo=UTC),),
+    )
+
+    gaps = active_strategy_gaps(
+        (active_gap, inactive_gap),
+        BaselineStrategyConfig(
+            allowed_sessions=frozenset({"london"}),
+            allowed_london_subwindows=frozenset({"open", "mid"}),
+        ),
+    )
+
+    assert gaps == (active_gap,)

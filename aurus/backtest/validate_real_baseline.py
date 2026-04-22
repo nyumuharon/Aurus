@@ -140,6 +140,8 @@ def format_validation_report(report: RealDataValidationReport) -> str:
             f"unexpected gaps: {report.gap_policy.unexpected_gaps}",
             f"expected missing bars: {report.gap_policy.expected_missing_bars}",
             f"unexpected missing bars: {report.gap_policy.unexpected_missing_bars}",
+            f"active unexpected gaps: {report.active_gap_policy.unexpected_gaps}",
+            f"active unexpected missing bars: {report.active_gap_policy.unexpected_missing_bars}",
             "",
             "Demo readiness",
             f"ready: {readiness.ready}",
