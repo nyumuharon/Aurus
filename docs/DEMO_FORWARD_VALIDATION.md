@@ -65,3 +65,25 @@ adapter with an idempotent client order key, and appends decisions to
 - Severe-friction PF below 1.
 - Rolling forward net PnL below zero after at least 30 completed trades.
 - Material change in broker spread regime.
+
+## Suggested Daily Schedule
+
+Use a user-level cron entry or systemd timer after confirming the MT5 export command works
+from the same shell environment.
+
+Example cron entry for weekdays after the London session:
+
+```cron
+30 14 * * 1-5 cd /home/v3ct0r7/Aurus && \
+  wine "/home/v3ct0r7/.wine/drive_c/Program Files/MetaTrader 5/terminal64.exe" \
+    /config:"/home/v3ct0r7/.wine/drive_c/Program Files/MetaTrader 5/export_xauusd_m5.ini" && \
+  . .venv/bin/activate && \
+  python -m aurus.ops.run_demo_workflow \
+    --data /home/v3ct0r7/xauusd_m5.csv \
+    --artifact-dir artifacts/demo-workflow \
+    --paper-state-dir artifacts/demo-paper-forward \
+    --fail-on-not-ready
+```
+
+Failure of the workflow command means readiness gates failed and the run should be reviewed
+before the next trading day.
