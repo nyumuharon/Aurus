@@ -1,0 +1,36 @@
+{
+  "artifacts": {
+    "gap_audit_csv": "artifacts/demo-workflow/real-data-gap-audit.csv",
+    "paper_state_dir": "artifacts/demo-paper-forward",
+    "validation_csv": "artifacts/demo-workflow/real-baseline-validation.csv"
+  },
+  "blockers": [],
+  "full_sample": {
+    "max_drawdown": "85.1124285714285714285715",
+    "net_pnl": "1342.563499999999999999999996",
+    "profit_factor": "1.723777318942930768650198925",
+    "trades": 1579,
+    "win_rate": "0.8017732742241925269157694744"
+  },
+  "gap_policy": {
+    "active_unexpected_gaps": 2,
+    "active_unexpected_missing_bars": 4
+  },
+  "generated_at": "2026-04-22T13:02:54.406413+00:00",
+  "paper_forward": {
+    "latest_bar_timestamp": "2026-04-21T14:20:00+00:00",
+    "rejected_decisions": 0,
+    "signals": 0,
+    "submitted_orders": 0
+  },
+  "ready": true,
+  "walk_forward": {
+    "positive_profit_factor_windows": 20,
+    "profitable_windows": 20,
+    "windows": 20
+  },
+  "warnings": [
+    "small unexpected active-window data gaps remain: 4 missing bars",
+    "some bars exceeded the strategy spread limit: 229"
+  ]
+}
