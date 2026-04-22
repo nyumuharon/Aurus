@@ -14,8 +14,9 @@ claiming live profitability from historical backtests.
 1. Export the latest MT5 M5 bars.
 2. Run the real baseline backtest.
 3. Run real validation.
-4. Run one paper-forward decision cycle from the latest closed bar.
-5. Save artifacts before changing strategy logic.
+4. Audit data gaps against active strategy windows.
+5. Run one paper-forward decision cycle from the latest closed bar.
+6. Save artifacts before changing strategy logic.
 
 Commands:
 
@@ -27,6 +28,9 @@ python -m aurus.backtest.run_real_baseline --data /home/v3ct0r7/xauusd_m5.csv
 python -m aurus.backtest.validate_real_baseline \
   --data /home/v3ct0r7/xauusd_m5.csv \
   --output artifacts/real-baseline-validation.csv
+python -m aurus.backtest.audit_real_gaps \
+  --data /home/v3ct0r7/xauusd_m5.csv \
+  --output artifacts/real-data-gap-audit.csv
 python -m aurus.execution.run_paper_forward \
   --data /home/v3ct0r7/xauusd_m5.csv \
   --state-dir artifacts/demo-paper-forward
