@@ -25,7 +25,7 @@ def current_daily_trend_config(*, quantity: Decimal = Decimal("1")) -> DailyLond
         context_atr_period=14,
         windows=(DailyTrendWindow(label="pre_london_full", entry_hour_utc=6, exit_hour_utc=21),),
         atr_stop_multiplier=Decimal("3"),
-        reward_risk=Decimal("2.5"),
+        reward_risk=Decimal("3"),
         quantity=quantity,
     )
 

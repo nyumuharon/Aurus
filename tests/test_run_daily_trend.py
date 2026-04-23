@@ -23,7 +23,7 @@ def test_current_daily_trend_config_uses_daily_research_defaults() -> None:
     assert config.windows[0].entry_hour_utc == 6
     assert config.windows[0].exit_hour_utc == 21
     assert config.atr_stop_multiplier == Decimal("3")
-    assert config.reward_risk == Decimal("2.5")
+    assert config.reward_risk == Decimal("3")
     assert config.quantity == Decimal("1")
     assert backtest_config.stop_tightening_enabled is False
 
