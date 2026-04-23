@@ -57,7 +57,7 @@ continuation entries:
 ## Current Structural Research Branch
 - timeframe: M5 execution with 1H EMA trend context
 - entry: 06:00 UTC
-- forced exit: 21:00 UTC
+- forced exit: 22:00 UTC
 - stop: 3x 1H ATR
 - target: 3R
 - status: profitable baseline to beat, not final 10% monthly solution

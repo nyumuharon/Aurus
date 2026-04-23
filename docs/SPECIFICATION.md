@@ -77,7 +77,7 @@ Before promoting a setup, produce:
 The current daily trend branch is:
 
 - entry: 06:00 UTC
-- exit: 21:00 UTC
+- exit: 22:00 UTC
 - direction: 1H EMA trend
 - stop: 3x 1H ATR
 - target: 3R
