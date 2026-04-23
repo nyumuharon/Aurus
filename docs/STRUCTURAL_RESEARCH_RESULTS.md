@@ -145,3 +145,56 @@ Decision:
   starting equity.
 - The 2% and progressive variants have unacceptable drawdown for a 10,000 USD account.
 - The next improvement must come from new structure, not risk scaling.
+
+## Scan: Daily Channel Breakouts
+
+Command:
+
+```bash
+python -m aurus.backtest.scan_channel_breakouts \
+  --data /home/v3ct0r7/xauusd_m5_dukascopy_6y.csv \
+  --output artifacts/channel-breakout-scan.csv \
+  --top 20
+```
+
+Best channel-breakout row:
+
+| Parameters | Trades | PF | Net PnL | Avg Monthly PnL | Worst Month | Max DD | Positive Months |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| daily_channel_breakout:hours=72:start=7:exit=22:stop=atr2.0:rr=2.0 | 804 | 1.2850 | 1180.91 | 16.18 | -125.85 | 324.89 | 39 / 73 |
+
+Decision:
+- Do not replace the daily trend baseline with channel breakout.
+- The best channel-breakout result is profitable and has controlled drawdown, but
+  it is weaker than the daily trend baseline on net PnL and average monthly PnL.
+- It is still useful as a candidate second component because it is a different
+  structural expression of trend expansion: previous multi-day channel break,
+  ATR stop, fixed RR target.
+
+## Portfolio Check: Daily Trend + Channel Breakout
+
+Command:
+
+```bash
+python -m aurus.backtest.analyze_structure_portfolio \
+  --data /home/v3ct0r7/xauusd_m5_dukascopy_6y.csv \
+  --output artifacts/structure-portfolio-trades.csv
+```
+
+Result:
+
+| Component | Trades | PF | Net PnL | Avg Monthly PnL | Worst Month | Max DD | Positive Months |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Daily trend | 1339 | 1.2974 | 3064.99 | 41.99 | -258.17 | 631.75 | 44 / 73 |
+| Channel breakout | 804 | 1.2850 | 1180.91 | 16.18 | -125.85 | 324.89 | 39 / 73 |
+| Combined | 2143 | 1.2939 | 4245.90 | 58.16 | -207.07 | 645.98 | 42 / 73 |
+
+Decision:
+- The combined structure improves fixed-size net PnL and average monthly PnL
+  without reducing PF materially.
+- It does not yet meet the 10% monthly target on a 10,000 USD account using
+  fixed quantity 1.
+- This is the best direction found so far: increase structurally different
+  profitable opportunities instead of increasing risk on the same fragile signal.
+- Next research should test another independent structure and then evaluate
+  portfolio interaction, not loosen the same entry repeatedly.
