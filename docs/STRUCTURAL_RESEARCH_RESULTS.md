@@ -133,9 +133,15 @@ Result:
 | 0.5% | 15673.19 | 0.78% | 10.62% | -4.70% | 1 / 73 | 23.04% |
 | 1.0% | 23367.20 | 1.83% | 30.74% | -9.35% | 5 / 73 | 47.08% |
 | 2.0% | 44832.22 | 4.77% | 111.60% | -22.50% | 17 / 73 | 96.31% |
+| Progressive 2.0% -> 5.0% | 49612.48 | 5.43% | 190.05% | -23.96% | 16 / 73 | 100.79% |
+| Progressive 2.0% -> 8.0% | 33931.26 | 3.28% | 148.46% | -18.97% | 15 / 73 | 106.65% |
+| Progressive 2.0% -> 10.0% | 41446.43 | 4.31% | 194.89% | -20.02% | 15 / 73 | 99.20% |
 
 Decision:
 - Even at the maximum allowed 2% risk per trade, the current structure does not
   produce consistent 10% monthly returns.
-- The 2% variant has unacceptable drawdown for a 10,000 USD account.
+- Progressive risk starting at 2% also does not produce consistent 10% monthly
+  returns. It increases upside, but drawdown becomes close to or above the account
+  starting equity.
+- The 2% and progressive variants have unacceptable drawdown for a 10,000 USD account.
 - The next improvement must come from new structure, not risk scaling.

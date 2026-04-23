@@ -28,7 +28,9 @@ class RTrade:
 class RiskNormalizedResult:
     """Risk-normalized account metrics."""
 
+    model: str
     risk_pct: Decimal
+    max_risk_pct: Decimal
     ending_equity: Decimal
     net_return_pct: Decimal
     max_drawdown_pct: Decimal
@@ -88,6 +90,71 @@ def simulate_risk_normalized_returns(
         max_drawdown = max(max_drawdown, peak - equity)
         monthly_pnl[trade.exit_month] += pnl
 
+    return build_risk_result(
+        model=f"fixed_{risk_pct}",
+        risk_pct=risk_pct,
+        max_risk_pct=risk_pct,
+        starting_equity=starting_equity,
+        ending_equity=equity,
+        max_drawdown=max_drawdown,
+        monthly_pnl=monthly_pnl,
+    )
+
+
+def simulate_progressive_risk_returns(
+    trades: tuple[RTrade, ...],
+    *,
+    starting_equity: Decimal,
+    initial_risk_pct: Decimal = Decimal("0.02"),
+    step_risk_pct: Decimal = Decimal("0.005"),
+    profit_step_pct: Decimal = Decimal("0.10"),
+    max_risk_pct: Decimal = Decimal("0.05"),
+    reset_on_drawdown: bool = True,
+) -> RiskNormalizedResult:
+    """Increase risk gradually as equity reaches new profit steps."""
+
+    equity = starting_equity
+    peak = starting_equity
+    max_drawdown = Decimal("0")
+    monthly_pnl: defaultdict[str, Decimal] = defaultdict(Decimal)
+
+    for trade in trades:
+        profit_steps = int(((peak / starting_equity) - Decimal("1")) / profit_step_pct)
+        active_risk_pct = min(
+            initial_risk_pct + (Decimal(profit_steps) * step_risk_pct),
+            max_risk_pct,
+        )
+        if reset_on_drawdown and equity < peak:
+            active_risk_pct = initial_risk_pct
+        pnl = equity * active_risk_pct * trade.realized_r
+        equity += pnl
+        peak = max(peak, equity)
+        max_drawdown = max(max_drawdown, peak - equity)
+        monthly_pnl[trade.exit_month] += pnl
+
+    return build_risk_result(
+        model=(f"progressive_{initial_risk_pct}_{step_risk_pct}_{profit_step_pct}_{max_risk_pct}"),
+        risk_pct=initial_risk_pct,
+        max_risk_pct=max_risk_pct,
+        starting_equity=starting_equity,
+        ending_equity=equity,
+        max_drawdown=max_drawdown,
+        monthly_pnl=monthly_pnl,
+    )
+
+
+def build_risk_result(
+    *,
+    model: str,
+    risk_pct: Decimal,
+    max_risk_pct: Decimal,
+    starting_equity: Decimal,
+    ending_equity: Decimal,
+    max_drawdown: Decimal,
+    monthly_pnl: defaultdict[str, Decimal] | dict[str, Decimal],
+) -> RiskNormalizedResult:
+    """Build a risk-normalized result from equity and monthly PnL."""
+
     monthly_returns = tuple(
         (pnl / starting_equity) * Decimal("100") for pnl in monthly_pnl.values()
     )
@@ -96,9 +163,11 @@ def simulate_risk_normalized_returns(
         sum(monthly_returns, Decimal("0")) / Decimal(total_months) if total_months else Decimal("0")
     )
     return RiskNormalizedResult(
+        model=model,
         risk_pct=risk_pct,
-        ending_equity=equity,
-        net_return_pct=((equity - starting_equity) / starting_equity) * Decimal("100"),
+        max_risk_pct=max_risk_pct,
+        ending_equity=ending_equity,
+        net_return_pct=((ending_equity - starting_equity) / starting_equity) * Decimal("100"),
         max_drawdown_pct=(max_drawdown / starting_equity) * Decimal("100"),
         average_monthly_return_pct=average_monthly_return,
         best_monthly_return_pct=max(monthly_returns) if monthly_returns else Decimal("0"),
@@ -117,7 +186,9 @@ def write_risk_report(path: Path, rows: tuple[RiskNormalizedResult, ...]) -> Non
         writer = csv.writer(handle)
         writer.writerow(
             [
+                "model",
                 "risk_pct",
+                "max_risk_pct",
                 "ending_equity",
                 "net_return_pct",
                 "max_drawdown_pct",
@@ -132,7 +203,9 @@ def write_risk_report(path: Path, rows: tuple[RiskNormalizedResult, ...]) -> Non
         for row in rows:
             writer.writerow(
                 [
+                    row.model,
                     row.risk_pct,
+                    row.max_risk_pct,
                     row.ending_equity,
                     row.net_return_pct,
                     row.max_drawdown_pct,
@@ -150,13 +223,18 @@ def format_risk_rows(rows: tuple[RiskNormalizedResult, ...]) -> str:
     """Render risk-normalized rows."""
 
     lines = [
-        "risk_pct ending_equity net_return% max_dd% avg_month% best_month% worst_month% >=10%months"
+        (
+            "model risk_pct max_risk_pct ending_equity net_return% max_dd% "
+            "avg_month% best_month% worst_month% >=10%months"
+        )
     ]
     for row in rows:
         lines.append(
             " ".join(
                 [
+                    row.model,
                     str(row.risk_pct),
+                    str(row.max_risk_pct),
                     str(row.ending_equity),
                     str(row.net_return_pct),
                     str(row.max_drawdown_pct),
@@ -196,12 +274,40 @@ def main() -> None:
     args = parse_args()
     trades = extract_daily_trend_r_trades(args.data)
     rows = tuple(
-        simulate_risk_normalized_returns(
-            trades,
-            starting_equity=args.starting_equity,
-            risk_pct=risk_pct,
-        )
-        for risk_pct in (Decimal("0.005"), Decimal("0.01"), Decimal("0.02"))
+        [
+            *(
+                simulate_risk_normalized_returns(
+                    trades,
+                    starting_equity=args.starting_equity,
+                    risk_pct=risk_pct,
+                )
+                for risk_pct in (Decimal("0.005"), Decimal("0.01"), Decimal("0.02"))
+            ),
+            simulate_progressive_risk_returns(
+                trades,
+                starting_equity=args.starting_equity,
+                initial_risk_pct=Decimal("0.02"),
+                step_risk_pct=Decimal("0.005"),
+                profit_step_pct=Decimal("0.10"),
+                max_risk_pct=Decimal("0.05"),
+            ),
+            simulate_progressive_risk_returns(
+                trades,
+                starting_equity=args.starting_equity,
+                initial_risk_pct=Decimal("0.02"),
+                step_risk_pct=Decimal("0.01"),
+                profit_step_pct=Decimal("0.10"),
+                max_risk_pct=Decimal("0.08"),
+            ),
+            simulate_progressive_risk_returns(
+                trades,
+                starting_equity=args.starting_equity,
+                initial_risk_pct=Decimal("0.02"),
+                step_risk_pct=Decimal("0.01"),
+                profit_step_pct=Decimal("0.20"),
+                max_risk_pct=Decimal("0.10"),
+            ),
+        ]
     )
     write_risk_report(args.output, rows)
     print(format_risk_rows(rows))
