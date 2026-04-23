@@ -89,3 +89,28 @@ Improve structure, not risk:
 3. Test whether combining the current daily trend baseline with non-overlapping
    high-quality impulse hours improves monthly PnL without materially worsening
    drawdown.
+
+## Scan: Impulse Continuation By UTC Hour
+
+Command:
+
+```bash
+python -m aurus.backtest.analyze_impulse_hours \
+  --data /home/v3ct0r7/xauusd_m5_dukascopy_6y.csv \
+  --output artifacts/impulse-hour-analysis.csv \
+  --top 20
+```
+
+Best robust row with at least 100 trades:
+
+| Hour UTC | Parameters | Trades | PF | Net PnL | Avg Monthly PnL | Worst Month | Max DD |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 06 | impulse_continuation:bars=12:atr=0.75:rr=3.0 | 531 | 1.2165 | 774.94 | 10.62 | -168.05 | 250.96 |
+
+Decision:
+- Do not promote impulse continuation as the main branch.
+- The best robust impulse hour is useful but weaker than the daily trend baseline.
+- High-PF rows at 12, 16, and 20 UTC were too small to trust.
+- The 06 UTC impulse signal overlaps the current daily trend entry hour, so it
+  should not simply be added as another same-direction trade without a portfolio
+  conflict rule.
