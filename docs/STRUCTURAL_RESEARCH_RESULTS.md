@@ -114,3 +114,28 @@ Decision:
 - The 06 UTC impulse signal overlaps the current daily trend entry hour, so it
   should not simply be added as another same-direction trade without a portfolio
   conflict rule.
+
+## Risk-Normalized Daily Trend Check
+
+Command:
+
+```bash
+python -m aurus.backtest.risk_normalized_daily_trend \
+  --data /home/v3ct0r7/xauusd_m5_dukascopy_6y.csv \
+  --output artifacts/daily-trend-risk-normalized.csv \
+  --starting-equity 10000
+```
+
+Result:
+
+| Risk / Trade | Ending Equity | Avg Monthly Return | Best Month | Worst Month | Months >= 10% | Max DD |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0.5% | 15673.19 | 0.78% | 10.62% | -4.70% | 1 / 73 | 23.04% |
+| 1.0% | 23367.20 | 1.83% | 30.74% | -9.35% | 5 / 73 | 47.08% |
+| 2.0% | 44832.22 | 4.77% | 111.60% | -22.50% | 17 / 73 | 96.31% |
+
+Decision:
+- Even at the maximum allowed 2% risk per trade, the current structure does not
+  produce consistent 10% monthly returns.
+- The 2% variant has unacceptable drawdown for a 10,000 USD account.
+- The next improvement must come from new structure, not risk scaling.
