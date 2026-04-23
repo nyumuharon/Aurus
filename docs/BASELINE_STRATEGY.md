@@ -45,10 +45,31 @@ continuation entries:
 - ATR floor optional
 
 ## Take Profit
-- fixed 2R
+- current daily trend branch uses fixed 3R
+- TP distance must be greater than SL distance for every trade
+- higher RR is preferred only when it improves full-sample and stress results
 
 ## Position Sizing
 - fixed % risk per trade
+- first trade risk must be no more than 2% of account equity
+- do not use larger size to compensate for weak structure
+
+## Current Structural Research Branch
+- timeframe: M5 execution with 1H EMA trend context
+- entry: 06:00 UTC
+- forced exit: 21:00 UTC
+- stop: 3x 1H ATR
+- target: 3R
+- status: profitable baseline to beat, not final 10% monthly solution
+
+## Next Research Direction
+- analyze all six years by UTC hour to find where profitable setups cluster
+- test pattern families one at a time:
+  - trend continuation after high-volatility impulse
+  - opening range breakout with structure stop
+  - pullback after confirmed 1H trend acceleration
+  - failed breakout reversal at active-hour extremes
+- reject any structure that only improves by adding size
 
 ## Notes
 - deterministic
