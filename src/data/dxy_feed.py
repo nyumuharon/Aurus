@@ -130,3 +130,57 @@ def get_dxy_candles(count: int = 250):
     ]
     logger.info("Fetched %d DXY 1H candles.", len(candles))
     return candles
+
+
+def get_dxy_trend():
+    """Return a full DXY context dict with current price and trend direction.
+
+    Trend is determined by comparing EMA-50 vs EMA-200 on 1-hour candles:
+        EMA50 > EMA200              → BULLISH  (DXY rising → bearish for gold)
+        EMA50 < EMA200              → BEARISH  (DXY falling → bullish for gold)
+        |EMA50 - EMA200| < 0.05    → NEUTRAL
+
+    If EMA calculation fails (insufficient data) the trend defaults to NEUTRAL
+    so the system can continue operating safely.
+
+    Returns:
+        dict — {"timestamp": str, "price": float, "trend": str}
+        None — if DXY price AND candle fetch both fail.
+    """
+    price = get_dxy_price()
+    candles = get_dxy_candles(count=250)
+
+    # Determine trend from EMA crossover
+    trend = "NEUTRAL"  # safe default
+
+    if candles:
+        closes = [c["close"] for c in candles]
+        ema50 = calculate_ema(closes, 50)
+        ema200 = calculate_ema(closes, 200)
+
+        if ema50 is not None and ema200 is not None:
+            diff = ema50 - ema200
+            if abs(diff) < _NEUTRAL_BAND:
+                trend = "NEUTRAL"
+            elif diff > 0:
+                trend = "BULLISH"
+            else:
+                trend = "BEARISH"
+        else:
+            logger.warning("EMA calculation failed — defaulting DXY trend to NEUTRAL.")
+    else:
+        logger.warning("No DXY candles available — defaulting trend to NEUTRAL.")
+
+    if price is None and not candles:
+        logger.error("DXY feed completely unavailable — returning None.")
+        return None
+
+    # Use last candle close as price fallback if tick is unavailable
+    if price is None and candles:
+        price = candles[-1]["close"]
+
+    return {
+        "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+        "price": price,
+        "trend": trend,
+    }
