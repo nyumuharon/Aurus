@@ -83,3 +83,50 @@ def get_dxy_price():
     price = float(tick.bid)
     logger.info("DXY spot price: %.4f", price)
     return price
+
+
+def get_dxy_candles(count: int = 250):
+    """Fetch the last *count* 1-hour DXY candles from MetaTrader 5.
+
+    Uses the 1-hour timeframe (TIMEFRAME_H1) which is required for the
+    EMA 50 vs EMA 200 trend calculation in get_dxy_trend().
+
+    Args:
+        count: Number of candles to retrieve (default: 250, enough for EMA-200).
+
+    Returns:
+        list[dict] — candles with keys: time, open, high, low, close, volume.
+        []         — MT5 returned an empty result.
+        None       — MT5 unavailable or fetch failed.
+    """
+    if mt5 is None:
+        logger.warning("MetaTrader5 not available — cannot fetch DXY candles.")
+        return None
+
+    timeframe = mt5.TIMEFRAME_H1
+    raw = mt5.copy_rates_from_pos(_DXY_SYMBOL, timeframe, 0, count)
+
+    if raw is None:
+        logger.warning(
+            "MT5 returned no candle data for DXY (count=%d): %s",
+            count, mt5.last_error(),
+        )
+        return None
+
+    if len(raw) == 0:
+        logger.warning("MT5 returned empty candle list for DXY.")
+        return []
+
+    candles = [
+        {
+            "time": int(row["time"]),
+            "open": float(row["open"]),
+            "high": float(row["high"]),
+            "low": float(row["low"]),
+            "close": float(row["close"]),
+            "volume": int(row["tick_volume"]),
+        }
+        for row in raw
+    ]
+    logger.info("Fetched %d DXY 1H candles.", len(candles))
+    return candles
