@@ -30,3 +30,32 @@ _DXY_SYMBOL = "DXY"
 
 # EMA neutrality band — if |EMA50 - EMA200| < this value, trend is NEUTRAL
 _NEUTRAL_BAND = 0.05
+
+
+def calculate_ema(prices: list, period: int):
+    """Calculate the Exponential Moving Average (EMA) for a list of prices.
+
+    Uses the standard EMA formula with a smoothing factor of 2/(period+1).
+    The first EMA value is seeded with the simple average of the first
+    *period* prices.
+
+    Args:
+        prices: Ordered list of float prices (oldest first).
+        period: EMA lookback period (e.g. 50, 200).
+
+    Returns:
+        float — the final EMA value for the given price series.
+        None  — if prices is empty or has fewer elements than period.
+    """
+    if not prices or len(prices) < period:
+        logger.warning(
+            "Insufficient data to calculate EMA-%d (got %d prices).",
+            period, len(prices) if prices else 0,
+        )
+        return None
+
+    k = 2.0 / (period + 1)
+    ema = sum(prices[:period]) / period  # seed with SMA of first `period` values
+    for price in prices[period:]:
+        ema = price * k + ema * (1 - k)
+    return ema
