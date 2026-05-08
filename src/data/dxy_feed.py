@@ -59,3 +59,27 @@ def calculate_ema(prices: list, period: int):
     for price in prices[period:]:
         ema = price * k + ema * (1 - k)
     return ema
+
+
+def get_dxy_price():
+    """Fetch the current DXY spot price from MetaTrader 5.
+
+    Returns:
+        float — current DXY bid price.
+        None  — if MT5 is unavailable or the symbol tick cannot be retrieved.
+    """
+    if mt5 is None:
+        logger.warning("MetaTrader5 not available — cannot fetch DXY price.")
+        return None
+
+    tick = mt5.symbol_info_tick(_DXY_SYMBOL)
+    if tick is None:
+        logger.warning(
+            "MT5 returned no tick data for symbol '%s': %s",
+            _DXY_SYMBOL, mt5.last_error(),
+        )
+        return None
+
+    price = float(tick.bid)
+    logger.info("DXY spot price: %.4f", price)
+    return price
