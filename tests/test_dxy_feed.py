@@ -122,3 +122,39 @@ class TestGetDxyCandles:
         result = dxy_feed.get_dxy_candles()
         assert result == []
         _reset_mock()
+
+
+# ---------------------------------------------------------------------------
+# Test 3 — calculate_ema() returns correct value for known input
+# ---------------------------------------------------------------------------
+
+class TestCalculateEma:
+    """Test 3: calculate_ema() returns correct value for a known input series."""
+
+    def test_returns_correct_ema_for_known_input(self):
+        """Test 3: EMA-3 of [1, 2, 3, 4, 5] should equal exactly 4.0."""
+        # Manual derivation:
+        #   k = 2/(3+1) = 0.5
+        #   seed = (1+2+3)/3 = 2.0
+        #   EMA after 4: 4 * 0.5 + 2.0 * 0.5 = 3.0
+        #   EMA after 5: 5 * 0.5 + 3.0 * 0.5 = 4.0
+        result = dxy_feed.calculate_ema([1.0, 2.0, 3.0, 4.0, 5.0], period=3)
+        assert result == pytest.approx(4.0, rel=1e-6)
+
+    def test_returns_none_for_insufficient_data(self):
+        """calculate_ema() returns None when len(prices) < period."""
+        result = dxy_feed.calculate_ema([1.0, 2.0], period=3)
+        assert result is None
+
+    def test_returns_none_for_empty_list(self):
+        """calculate_ema() returns None when prices is an empty list."""
+        result = dxy_feed.calculate_ema([], period=50)
+        assert result is None
+
+    def test_returns_float_for_large_series(self):
+        """calculate_ema() returns a float for a 250-element series."""
+        prices = [104.0 + i * 0.01 for i in range(250)]
+        result = dxy_feed.calculate_ema(prices, period=200)
+        assert isinstance(result, float)
+        assert result > 0
+
