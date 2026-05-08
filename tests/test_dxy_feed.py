@@ -66,3 +66,25 @@ def _reset_mock():
     tick.bid = 104.32
     MT5.symbol_info_tick.return_value = tick
     MT5.copy_rates_from_pos.return_value = _make_candle_array()
+
+
+# ---------------------------------------------------------------------------
+# Test 1 — get_dxy_price() returns a float greater than zero
+# ---------------------------------------------------------------------------
+
+class TestGetDxyPrice:
+    """Test 1: get_dxy_price() returns a float greater than zero."""
+
+    def test_returns_float_greater_than_zero(self):
+        """Test 1: get_dxy_price() must return a float > 0."""
+        result = dxy_feed.get_dxy_price()
+        assert isinstance(result, float), "get_dxy_price() must return a float"
+        assert result > 0, "get_dxy_price() must return a value > 0"
+
+    def test_returns_none_when_tick_unavailable(self):
+        """get_dxy_price() returns None when MT5 returns no tick."""
+        MT5.symbol_info_tick.return_value = None
+        result = dxy_feed.get_dxy_price()
+        assert result is None
+        _reset_mock()
+
