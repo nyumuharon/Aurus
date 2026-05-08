@@ -217,3 +217,36 @@ class TestGetDxyTrend:
         _reset_mock()
 
 
+# ---------------------------------------------------------------------------
+# Test 6 — handles empty candle list without crashing
+# ---------------------------------------------------------------------------
+
+class TestEmptyCandles:
+    """Test 6: Function handles empty candle list without crashing."""
+
+    def test_trend_is_neutral_when_candles_empty(self):
+        """get_dxy_trend() defaults to NEUTRAL when MT5 returns no candles."""
+        MT5.copy_rates_from_pos.return_value = np.array([], dtype=np.float64)
+        result = dxy_feed.get_dxy_trend()
+        assert result["trend"] == "NEUTRAL"
+        _reset_mock()
+
+    def test_returns_none_when_both_price_and_candles_fail(self):
+        """get_dxy_trend() returns None when the feed is entirely broken."""
+        MT5.symbol_info_tick.return_value = None
+        MT5.copy_rates_from_pos.return_value = None
+        result = dxy_feed.get_dxy_trend()
+        assert result is None
+        _reset_mock()
+
+    def test_uses_last_close_as_fallback_price(self):
+        """If spot price fails, uses the last 1H candle's close as fallback."""
+        MT5.symbol_info_tick.return_value = None
+        # _make_candle_array defaults to base_price=104.0 and last candle
+        # close is 104.0 + 249 * 0.01 = 106.49
+        result = dxy_feed.get_dxy_trend()
+        assert result["price"] == pytest.approx(106.49, rel=1e-6)
+        _reset_mock()
+
+
+
