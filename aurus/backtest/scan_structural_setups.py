@@ -394,6 +394,139 @@ def scan_impulse_continuation(
     return trades
 
 
+def scan_compression_breakout(
+    *,
+    data: ResearchData,
+    compression_start_hour: int,
+    compression_end_hour: int,
+    breakout_end_hour: int,
+    max_range_atr: float,
+    reward_risk: float,
+    setup: str,
+) -> list[TradeCandidate]:
+    """Enter first breakout after an intraday compression window."""
+
+    trades: list[TradeCandidate] = []
+    for day, day_bars in data.bars_by_day.items():
+        compression_bars = tuple(
+            bar
+            for bar in bars_between(day_bars, day, compression_start_hour, compression_end_hour)
+            if bar.timestamp < day + timedelta(hours=compression_end_hour)
+        )
+        breakout_bars = tuple(
+            bar
+            for bar in bars_between(day_bars, day, compression_end_hour, breakout_end_hour)
+            if bar.timestamp > day + timedelta(hours=compression_end_hour)
+        )
+        if len(compression_bars) < 6 or len(breakout_bars) < 2:
+            continue
+        compression_high = max(bar.high for bar in compression_bars)
+        compression_low = min(bar.low for bar in compression_bars)
+        compression_range = compression_high - compression_low
+        context_atr_value = context_atr(data, breakout_bars[0].timestamp)
+        if (
+            not math.isfinite(context_atr_value)
+            or context_atr_value <= 0.0
+            or compression_range > context_atr_value * max_range_atr
+        ):
+            continue
+        for bar_index, bar in enumerate(breakout_bars):
+            if bar.high > compression_high:
+                trade = simulate_exit(
+                    setup=setup,
+                    side=1,
+                    entry_bar=bar,
+                    future_bars=breakout_bars[bar_index + 1 :],
+                    risk=max(compression_range, context_atr_value * 0.5),
+                    reward_risk=reward_risk,
+                )
+                if trade is not None:
+                    trades.append(trade)
+                break
+            if bar.low < compression_low:
+                trade = simulate_exit(
+                    setup=setup,
+                    side=-1,
+                    entry_bar=bar,
+                    future_bars=breakout_bars[bar_index + 1 :],
+                    risk=max(compression_range, context_atr_value * 0.5),
+                    reward_risk=reward_risk,
+                )
+                if trade is not None:
+                    trades.append(trade)
+                break
+    return trades
+
+
+def scan_session_run_reversal(
+    *,
+    data: ResearchData,
+    open_hour: int,
+    signal_hour: int,
+    exit_hour: int,
+    run_atr: float,
+    reward_risk: float,
+    setup: str,
+) -> list[TradeCandidate]:
+    """Fade an oversized session run once the signal hour prints a stall candle."""
+
+    trades: list[TradeCandidate] = []
+    for day, day_bars in data.bars_by_day.items():
+        open_bars = tuple(
+            bar
+            for bar in bars_between(day_bars, day, open_hour, open_hour + 1)
+            if bar.timestamp < day + timedelta(hours=open_hour + 1)
+        )
+        signal_bars = tuple(
+            bar
+            for bar in bars_between(day_bars, day, signal_hour, signal_hour + 1)
+            if bar.timestamp < day + timedelta(hours=signal_hour + 1)
+        )
+        future_bars = bars_between(day_bars, day, signal_hour, exit_hour)
+        if not open_bars or not signal_bars or len(future_bars) < 2:
+            continue
+        open_price = open_bars[0].open
+        signal_bar = signal_bars[-1]
+        context_atr_value = context_atr(data, signal_bar.timestamp)
+        if not math.isfinite(context_atr_value) or context_atr_value <= 0.0:
+            continue
+        future_index = next(
+            (
+                index
+                for index, future_bar in enumerate(future_bars)
+                if future_bar.timestamp == signal_bar.timestamp
+            ),
+            None,
+        )
+        if future_index is None:
+            continue
+        post_signal_bars = future_bars[future_index + 1 :]
+        move = signal_bar.close - open_price
+        if move >= context_atr_value * run_atr and signal_bar.close < signal_bar.open:
+            trade = simulate_exit(
+                setup=setup,
+                side=-1,
+                entry_bar=signal_bar,
+                future_bars=post_signal_bars,
+                risk=max(signal_bar.high - signal_bar.close, 0.0),
+                reward_risk=reward_risk,
+            )
+            if trade is not None:
+                trades.append(trade)
+        elif move <= -(context_atr_value * run_atr) and signal_bar.close > signal_bar.open:
+            trade = simulate_exit(
+                setup=setup,
+                side=1,
+                entry_bar=signal_bar,
+                future_bars=post_signal_bars,
+                risk=max(signal_bar.close - signal_bar.low, 0.0),
+                reward_risk=reward_risk,
+            )
+            if trade is not None:
+                trades.append(trade)
+    return trades
+
+
 def bars_between(
     bars: tuple[ResearchBar, ...],
     day_start: datetime,
@@ -417,6 +550,15 @@ def context_side_and_atr(data: ResearchData, timestamp: datetime) -> tuple[int, 
     ema_value = data.hour_ema[context_index]
     side = 1 if context_bar.close > ema_value else -1 if context_bar.close < ema_value else 0
     return side, data.hour_atr[context_index]
+
+
+def context_atr(data: ResearchData, timestamp: datetime) -> float:
+    """Return 1H ATR available at timestamp without trend gating."""
+
+    context_index = bisect_right(data.hour_timestamps, timestamp) - 1
+    if context_index < 0:
+        return math.nan
+    return data.hour_atr[context_index]
 
 
 def simulate_exit(

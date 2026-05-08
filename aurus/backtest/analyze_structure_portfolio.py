@@ -16,6 +16,8 @@ from aurus.backtest.scan_structural_setups import (
     load_research_data,
     max_drawdown,
     profit_factor,
+    scan_failed_breakout_reversal,
+    scan_impulse_continuation,
 )
 from aurus.backtest.types import TradeRecord
 from aurus.data import load_real_xauusd_5m_csv
@@ -61,6 +63,35 @@ def current_channel_component(data_path: Path) -> list[TradeCandidate]:
     )
 
 
+def current_ny_impulse_component(data_path: Path) -> list[TradeCandidate]:
+    """Return the current best selective NY impulse-continuation component."""
+
+    data = load_research_data(data_path)
+    trades = scan_impulse_continuation(
+        data=data,
+        impulse_bars=12,
+        impulse_atr_multiplier=0.75,
+        reward_risk=2.5,
+        setup="impulse_continuation:bars=12:atr=0.75:rr=2.5:hour=12",
+    )
+    return [trade for trade in trades if trade.entry_timestamp.hour == 12]
+
+
+def current_london_reversal_component(data_path: Path) -> list[TradeCandidate]:
+    """Return the current selective downside-offset London reversal component."""
+
+    data = load_research_data(data_path)
+    trades = scan_failed_breakout_reversal(
+        data=data,
+        range_start_hour=5,
+        range_end_hour=7,
+        exit_hour=22,
+        reward_risk=3.0,
+        setup="failed_breakout_reversal:pre_london:rr=3.0:hour=13",
+    )
+    return [trade for trade in trades if trade.entry_timestamp.hour == 13]
+
+
 def daily_trend_component(data_path: Path) -> tuple[TradeRecord, ...]:
     """Run the current daily trend baseline component."""
 
@@ -76,6 +107,8 @@ def combine_components(
     *,
     daily_trades: tuple[TradeRecord, ...],
     channel_trades: list[TradeCandidate],
+    impulse_trades: list[TradeCandidate] | None = None,
+    reversal_trades: list[TradeCandidate] | None = None,
 ) -> list[PortfolioTrade]:
     """Merge daily trend and channel-breakout trades in exit-time order."""
 
@@ -94,6 +127,22 @@ def combine_components(
                 source="channel_breakout",
                 exit_timestamp=channel_trade.exit_timestamp.isoformat(),
                 pnl=channel_trade.pnl,
+            )
+        )
+    for impulse_trade in impulse_trades or []:
+        trades.append(
+            PortfolioTrade(
+                source="ny_impulse",
+                exit_timestamp=impulse_trade.exit_timestamp.isoformat(),
+                pnl=impulse_trade.pnl,
+            )
+        )
+    for reversal_trade in reversal_trades or []:
+        trades.append(
+            PortfolioTrade(
+                source="london_reversal",
+                exit_timestamp=reversal_trade.exit_timestamp.isoformat(),
+                pnl=reversal_trade.pnl,
             )
         )
     return sorted(trades, key=lambda trade: trade.exit_timestamp)
@@ -180,9 +229,13 @@ def main() -> None:
     args = parse_args()
     daily_trades = daily_trend_component(args.data)
     channel_trades = current_channel_component(args.data)
+    impulse_trades = current_ny_impulse_component(args.data)
+    reversal_trades = current_london_reversal_component(args.data)
     portfolio_trades = combine_components(
         daily_trades=daily_trades,
         channel_trades=channel_trades,
+        impulse_trades=impulse_trades,
+        reversal_trades=reversal_trades,
     )
     summaries = [
         summarize_portfolio(
@@ -205,6 +258,28 @@ def main() -> None:
                     pnl=trade.pnl,
                 )
                 for trade in channel_trades
+            ],
+        ),
+        summarize_portfolio(
+            "ny_impulse",
+            [
+                PortfolioTrade(
+                    source="ny_impulse",
+                    exit_timestamp=trade.exit_timestamp.isoformat(),
+                    pnl=trade.pnl,
+                )
+                for trade in impulse_trades
+            ],
+        ),
+        summarize_portfolio(
+            "london_reversal",
+            [
+                PortfolioTrade(
+                    source="london_reversal",
+                    exit_timestamp=trade.exit_timestamp.isoformat(),
+                    pnl=trade.pnl,
+                )
+                for trade in reversal_trades
             ],
         ),
         summarize_portfolio("combined", portfolio_trades),
