@@ -22,14 +22,27 @@ def test_combine_components_sorts_by_exit_timestamp() -> None:
     channel = [
         trade_candidate(datetime(2026, 1, 2, tzinfo=UTC), 3.0),
     ]
+    impulse = [
+        trade_candidate(datetime(2026, 1, 4, tzinfo=UTC), 2.0),
+    ]
+    reversal = [
+        trade_candidate(datetime(2026, 1, 5, tzinfo=UTC), -1.0),
+    ]
 
-    combined = combine_components(daily_trades=daily, channel_trades=channel)
+    combined = combine_components(
+        daily_trades=daily,
+        channel_trades=channel,
+        impulse_trades=impulse,
+        reversal_trades=reversal,
+    )
 
-    assert [trade.pnl for trade in combined] == [5.0, 3.0, 4.0]
+    assert [trade.pnl for trade in combined] == [5.0, 3.0, 4.0, 2.0, -1.0]
     assert [trade.source for trade in combined] == [
         "daily_trend",
         "channel_breakout",
         "daily_trend",
+        "ny_impulse",
+        "london_reversal",
     ]
 
 
