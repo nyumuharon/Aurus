@@ -198,3 +198,159 @@ Decision:
   profitable opportunities instead of increasing risk on the same fragile signal.
 - Next research should test another independent structure and then evaluate
   portfolio interaction, not loosen the same entry repeatedly.
+
+## Third Component: Selective NY Impulse
+
+The best third component found from the existing scan families is a selective
+New York impulse-continuation slice:
+
+```text
+impulse_continuation:bars=12:atr=0.75:rr=2.5:hour=12
+```
+
+Standalone result:
+
+| Component | Trades | PF | Net PnL | Avg Monthly PnL | Worst Month | Max DD | Positive Months |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| NY impulse | 53 | 4.4628 | 499.56 | 15.14 | -19.47 | 57.13 | 20 / 33 |
+
+Three-component fixed-size portfolio:
+
+| Component | Trades | PF | Net PnL | Avg Monthly PnL | Worst Month | Max DD | Positive Months |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Daily trend | 1339 | 1.2974 | 3064.99 | 41.99 | -258.17 | 631.75 | 44 / 73 |
+| Channel breakout | 804 | 1.2850 | 1180.91 | 16.18 | -125.85 | 324.89 | 39 / 73 |
+| NY impulse | 53 | 4.4628 | 499.56 | 15.14 | -19.47 | 57.13 | 20 / 33 |
+| Combined | 2196 | 1.3252 | 4745.46 | 65.01 | -193.33 | 645.98 | 43 / 73 |
+
+Risk-normalized portfolio result on a 10,000 USD account:
+
+| Risk / Trade | Ending Equity | Avg Monthly Return | Best Month | Worst Month | Months >= 10% | Max DD |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0.5% | 20391.08 | 1.42% | 15.72% | -7.33% | 3 / 73 | 31.65% |
+| 1.0% | 38448.17 | 3.90% | 56.80% | -14.28% | 14 / 73 | 60.52% |
+| 2.0% | 108478.31 | 13.49% | 295.97% | -26.75% | 22 / 73 | 119.20% |
+| Progressive 2.0% -> 5.0% | 341989.41 | 45.48% | 1443.79% | -67.84% | 22 / 73 | 472.12% |
+
+Decision:
+- This third component improves fixed-size portfolio PF, net PnL, average monthly
+  PnL, and worst-month behavior.
+- It is a useful structural diversification leg because it trades a narrow NY
+  continuation state rather than another all-day trend stream.
+- It still does not make the portfolio safely capable of consistent 10% monthly
+  returns. The only way to produce many 10% months here is still to size into
+  unacceptable drawdown.
+- The next improvement must again come from structure quality, ideally another
+  component with better downside offset rather than a higher-variance trend leg.
+
+## Fourth Component: Selective London Reversal
+
+The reversal family was broadly weak, but one narrow slice was useful as a
+downside-offset component:
+
+```text
+failed_breakout_reversal:pre_london:rr=3.0:hour=13
+```
+
+Standalone result:
+
+| Component | Trades | PF | Net PnL | Avg Monthly PnL | Worst Month | Max DD | Positive Months |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| London reversal | 32 | 1.8263 | 66.00 | 2.87 | -11.12 | 49.76 | 8 / 23 |
+
+Four-component fixed-size portfolio:
+
+| Component | Trades | PF | Net PnL | Avg Monthly PnL | Worst Month | Max DD | Positive Months |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Daily trend | 1339 | 1.2974 | 3064.99 | 41.99 | -258.17 | 631.75 | 44 / 73 |
+| Channel breakout | 804 | 1.2850 | 1180.91 | 16.18 | -125.85 | 324.89 | 39 / 73 |
+| NY impulse | 53 | 4.4628 | 499.56 | 15.14 | -19.47 | 57.13 | 20 / 33 |
+| London reversal | 32 | 1.8263 | 66.00 | 2.87 | -11.12 | 49.76 | 8 / 23 |
+| Combined | 2228 | 1.3279 | 4811.46 | 65.91 | -193.33 | 617.35 | 42 / 73 |
+
+Risk-normalized portfolio result on a 10,000 USD account:
+
+| Risk / Trade | Ending Equity | Avg Monthly Return | Best Month | Worst Month | Months >= 10% | Max DD |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0.5% | 19685.53 | 1.33% | 17.85% | -8.34% | 3 / 73 | 33.24% |
+| 1.0% | 35756.95 | 3.53% | 61.73% | -16.29% | 14 / 73 | 63.54% |
+| 2.0% | 93034.24 | 11.37% | 292.91% | -30.74% | 18 / 73 | 113.75% |
+| Progressive 2.0% -> 5.0% | 249348.17 | 32.79% | 1112.80% | -30.79% | 19 / 73 | 309.65% |
+
+Decision:
+- The selective reversal slice is worth keeping because it improves the portfolio
+  PF and lowers fixed-size drawdown from 645.98 to 617.35.
+- It also lowers the 2% fixed-risk max drawdown from 119.20% to 113.75%.
+- This is still not enough to make the portfolio safely capable of 10% monthly
+  returns in a tradeable way.
+- The next component should again prioritize diversification and downside offset,
+  not another correlated trend-expansion leg.
+
+## Research Check: Compression Breakout
+
+Tested structure:
+
+```text
+compression_breakout:pre_london_to_ny_open:atr=1.0:rr=2.0
+```
+
+Standalone result:
+
+| Component | Trades | PF | Net PnL | Max DD |
+|---|---:|---:|---:|---:|
+| Compression breakout | 367 | 1.2726 | 271.61 | 87.65 |
+
+Portfolio impact when added to the current 4-component portfolio:
+
+| Portfolio | Trades | PF | Net PnL | Avg Monthly PnL | Worst Month | Max DD |
+|---|---:|---:|---:|---:|---:|---:|
+| Current 4-component | 2228 | 1.3279 | 4811.46 | 65.91 | -193.33 | 617.35 |
+| Plus compression breakout | 2595 | 1.3244 | 5083.07 | 69.63 | -190.66 | 635.19 |
+
+Decision:
+- Do not promote the compression-breakout sleeve.
+- It adds net PnL and average monthly PnL, but it slightly lowers PF and increases
+  drawdown versus the current 4-component portfolio.
+- This suggests it is still too correlated with the existing trend-expansion legs.
+- Keep the scanner as a research tool, but do not add this sleeve to the live
+  reference portfolio.
+
+## Research Family Failure: Session-Open Mean Reversion
+
+Family tested:
+- fade an oversized move away from a session open or early session base
+- require a later stall candle
+- exit on fixed RR or time stop
+
+This family was tested across:
+- Asia to London
+- pre-London to mid-session
+- London open / initial-balance to mid-session
+- London open / initial-balance to New York
+- New York open to late session
+
+Best corrected family slice:
+
+```text
+session_run_reversal:pre_london_to_mid:atr=3.0:rr=3.0
+```
+
+Standalone result:
+
+| Component | Trades | PF | Net PnL | Avg Monthly PnL | Worst Month | Max DD |
+|---|---:|---:|---:|---:|---:|---:|
+| Session run reversal | 91 | 1.5906 | 74.61 | 1.52 | -10.53 | 26.20 |
+
+Why the family still fails your target:
+- No tested slice produced all-positive months in its evaluation window.
+- No tested slice produced consistent >=10% monthly returns on a risk-normalized
+  account with small drawdown.
+- When promoted into the reference portfolio, the family could improve fixed-size
+  PF slightly, but account-level drawdown expanded materially once risk was sized
+  to the return target.
+
+Decision:
+- Conclusively fail this research family against the target:
+  all months positive, monthly returns consistently >=10%, and super-small drawdown.
+- Keep `scan_session_run_reversal(...)` only as a research utility.
+- Do not include this family in the reference portfolio.
