@@ -158,3 +158,62 @@ class TestCalculateEma:
         assert isinstance(result, float)
         assert result > 0
 
+
+# ---------------------------------------------------------------------------
+# Tests 4 & 5 — get_dxy_trend() dict structure and valid trend values
+# ---------------------------------------------------------------------------
+
+class TestGetDxyTrend:
+    """Tests 4 & 5: get_dxy_trend() returns correct structure and valid trend."""
+
+    def test_returns_dict_with_required_keys(self):
+        """Test 4: get_dxy_trend() returns dict with timestamp, price, trend."""
+        result = dxy_feed.get_dxy_trend()
+        assert isinstance(result, dict), "get_dxy_trend() must return a dict"
+        required = {"timestamp", "price", "trend"}
+        assert not (required - result.keys()), f"Dict missing keys: {required - result.keys()}"
+
+    def test_trend_value_is_valid(self):
+        """Test 5: trend value must be one of BULLISH, BEARISH, or NEUTRAL."""
+        result = dxy_feed.get_dxy_trend()
+        assert result["trend"] in {"BULLISH", "BEARISH", "NEUTRAL"}, (
+            f"Unexpected trend value: '{result['trend']}'"
+        )
+
+    def test_price_is_float_greater_than_zero(self):
+        """price field in trend dict must be a positive float."""
+        result = dxy_feed.get_dxy_trend()
+        assert isinstance(result["price"], float)
+        assert result["price"] > 0
+
+    def test_timestamp_is_formatted_string(self):
+        """timestamp field must be a non-empty string."""
+        result = dxy_feed.get_dxy_trend()
+        assert isinstance(result["timestamp"], str)
+        assert len(result["timestamp"]) > 0
+
+    def test_trend_is_bullish_when_ema50_above_ema200(self):
+        """Trend is BULLISH when the close prices are strongly rising (EMA50 > EMA200)."""
+        # Strongly rising prices ensure EMA50 > EMA200
+        rising = _make_candle_array(n=250, base_price=100.0)
+        # Override close to be strongly increasing
+        rising_copy = rising.copy()
+        for i in range(len(rising_copy)):
+            rising_copy["close"][i] = 100.0 + i * 1.0
+        MT5.copy_rates_from_pos.return_value = rising_copy
+        result = dxy_feed.get_dxy_trend()
+        assert result["trend"] == "BULLISH"
+        _reset_mock()
+
+    def test_trend_is_bearish_when_ema50_below_ema200(self):
+        """Trend is BEARISH when close prices are strongly falling (EMA50 < EMA200)."""
+        falling = _make_candle_array(n=250, base_price=200.0)
+        falling_copy = falling.copy()
+        for i in range(len(falling_copy)):
+            falling_copy["close"][i] = 200.0 - i * 1.0
+        MT5.copy_rates_from_pos.return_value = falling_copy
+        result = dxy_feed.get_dxy_trend()
+        assert result["trend"] == "BEARISH"
+        _reset_mock()
+
+
