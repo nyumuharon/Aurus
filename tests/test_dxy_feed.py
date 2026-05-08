@@ -88,3 +88,37 @@ class TestGetDxyPrice:
         assert result is None
         _reset_mock()
 
+
+# ---------------------------------------------------------------------------
+# Test 2 — get_dxy_candles() returns a non-empty list
+# ---------------------------------------------------------------------------
+
+class TestGetDxyCandles:
+    """Test 2: get_dxy_candles() returns a non-empty list."""
+
+    def test_returns_non_empty_list(self):
+        """Test 2: get_dxy_candles() must return a non-empty list."""
+        result = dxy_feed.get_dxy_candles()
+        assert isinstance(result, list)
+        assert len(result) > 0
+
+    def test_each_candle_has_required_keys(self):
+        """Each candle dict contains time, open, high, low, close, volume."""
+        result = dxy_feed.get_dxy_candles()
+        required = {"time", "open", "high", "low", "close", "volume"}
+        for candle in result:
+            assert not (required - candle.keys())
+
+    def test_returns_none_when_mt5_unavailable(self):
+        """get_dxy_candles() returns None when MT5 copy_rates_from_pos fails."""
+        MT5.copy_rates_from_pos.return_value = None
+        result = dxy_feed.get_dxy_candles()
+        assert result is None
+        _reset_mock()
+
+    def test_returns_empty_list_when_mt5_returns_empty(self):
+        """get_dxy_candles() returns [] when MT5 returns an empty array."""
+        MT5.copy_rates_from_pos.return_value = np.array([], dtype=np.float64)
+        result = dxy_feed.get_dxy_candles()
+        assert result == []
+        _reset_mock()
