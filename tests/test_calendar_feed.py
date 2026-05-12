@@ -100,3 +100,20 @@ class TestGetTodaysEvents:
         with patch("src.data.calendar_feed.requests.get", _mock_get(_make_raw_events())):
             result = calendar_feed.get_todays_events()
         assert len(result) > 0
+
+
+# ---------------------------------------------------------------------------
+# Test 2 — All returned events have required keys
+# ---------------------------------------------------------------------------
+
+class TestEventKeys:
+    """Test 2: All returned events have timestamp, event, impact, currency."""
+
+    def test_all_events_have_required_keys(self):
+        """Test 2: Every event dict must contain the four required keys."""
+        with patch("src.data.calendar_feed.requests.get", _mock_get(_make_raw_events())):
+            result = calendar_feed.get_todays_events()
+        required = {"timestamp", "event", "impact", "currency"}
+        for event in result:
+            missing = required - event.keys()
+            assert not missing, f"Event missing keys: {missing}"
