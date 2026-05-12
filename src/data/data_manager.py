@@ -137,3 +137,15 @@ def stop() -> None:
 
     price_feed.disconnect()
     logger.info("Data Manager: stopped successfully.")
+
+
+def is_ready() -> bool:
+    """Check if the system is fully initialized and price feed is alive.
+
+    Returns:
+        True  — system is running and MT5 is connected.
+        False — system not started, or price feed disconnected.
+    """
+    if not _is_running:
+        return False
+    return price_feed.is_connected()
