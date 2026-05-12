@@ -19,11 +19,16 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
-# MetaTrader5 is Windows-only; on Linux/CI mt5 is None and tests inject a mock.
+# MetaTrader5 is Windows-only; on Linux we fallback to the mt5linux bridge.
 try:
     import MetaTrader5 as mt5  # type: ignore[import]
 except ImportError:
-    mt5 = None  # type: ignore[assignment]
+    try:
+        from mt5linux import MetaTrader5
+        mt5 = MetaTrader5()  # type: ignore[assignment]
+    except Exception:
+        mt5 = None  # type: ignore[assignment]
+
 
 # DXY symbol as quoted on most MT5 brokers
 _DXY_SYMBOL = "DXY"

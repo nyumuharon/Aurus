@@ -16,13 +16,19 @@ import os
 import time
 from datetime import datetime, timedelta
 
-# MetaTrader5 is a Windows-only package. On Linux/CI the ImportError is caught
-# and mt5 is set to None so that all functions return safe fallback values and
-# unit tests can patch this reference with a mock.
+# MetaTrader5 is a Windows-only package. On Linux, we try to use the unofficial
+# mt5linux bridge. If both fail, mt5 is set to None for safe fallback values.
 try:
     import MetaTrader5 as mt5  # type: ignore[import]
 except ImportError:
-    mt5 = None  # type: ignore[assignment]
+    try:
+        from mt5linux import MetaTrader5
+        # The mt5linux package requires us to instantiate the class to use it
+        # as a drop-in module replacement. It assumes the server is running.
+        mt5 = MetaTrader5()  # type: ignore[assignment]
+    except Exception:
+        mt5 = None  # type: ignore[assignment]
+
 
 from config import settings
 
