@@ -135,3 +135,21 @@ class TestNoLowImpact:
             assert event["impact"] in {"HIGH", "MEDIUM"}, (
                 f"LOW impact event leaked through: {event}"
             )
+
+
+# ---------------------------------------------------------------------------
+# Test 4 — No non-USD/XAU currencies appear in results
+# ---------------------------------------------------------------------------
+
+class TestCurrencyFilter:
+    """Test 4: No non-USD/XAU currencies appear in results."""
+
+    def test_non_usd_xau_currencies_are_excluded(self):
+        """Test 4: Only USD and XAU events must appear in results."""
+        raw = _make_raw_events(include_eur=True)
+        with patch("src.data.calendar_feed.requests.get", _mock_get(raw)):
+            result = calendar_feed.get_todays_events()
+        for event in result:
+            assert event["currency"] in {"USD", "XAU"}, (
+                f"Unexpected currency: {event['currency']}"
+            )
