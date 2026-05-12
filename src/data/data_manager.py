@@ -81,3 +81,43 @@ def _scheduler_loop():
         time.sleep(1)
 
 
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+def start() -> bool:
+    """Initialize all feed connections and start background polling.
+
+    Returns:
+        True  — initialization successful.
+        False — failed to start (e.g. price feed connect failed).
+    """
+    global _is_running, _scheduler_thread
+
+    if _is_running:
+        logger.warning("Data Manager: start() called but already running.")
+        return True
+
+    logger.info("Data Manager: initializing feeds...")
+
+    if not price_feed.connect():
+        logger.error("Data Manager: failed to connect to price feed.")
+        return False
+
+    # Do initial synchronous fetches for background feeds
+    _update_news()
+    _update_dxy()
+    _update_calendar()
+
+    # Schedule background updates
+    schedule.clear()
+    schedule.every(5).minutes.do(_update_news)
+    schedule.every(1).minutes.do(_update_dxy)
+    schedule.every(1).hours.do(_update_calendar)
+
+    _is_running = True
+    _scheduler_thread = threading.Thread(target=_scheduler_loop, daemon=True)
+    _scheduler_thread.start()
+
+    logger.info("Data Manager: started successfully.")
+    return True
