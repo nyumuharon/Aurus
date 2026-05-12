@@ -1,6 +1,14 @@
-MetaTrader5==5.0.45
+# MetaTrader5==5.0.45
 pandas==2.2.2
 requests==2.31.0
 python-dotenv==1.0.1
 schedule==1.2.1
 pytest==8.2.0
+tensorflow==2.15.0
+torch==2.2.0
+pytorch-forecasting==1.1.1
+scikit-learn==1.4.2
+joblib==1.4.0
+yfinance==0.2.40
+numpy==1.26.4
+matplotlib==3.8.4
