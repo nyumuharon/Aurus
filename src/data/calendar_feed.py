@@ -17,8 +17,6 @@ from datetime import datetime, timedelta, timezone
 
 import requests
 
-from config import settings
-
 # ---------------------------------------------------------------------------
 # Module logger
 # ---------------------------------------------------------------------------
