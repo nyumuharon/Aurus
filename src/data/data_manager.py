@@ -149,3 +149,59 @@ def is_ready() -> bool:
     if not _is_running:
         return False
     return price_feed.is_connected()
+
+
+def get_market_snapshot() -> dict:
+    """Return a unified dictionary of all market data for the current tick.
+
+    Assembles data from the price, news, DXY, and calendar feeds into a
+    single dictionary. Calculates overall system status.
+
+    Returns:
+        dict — unified data snapshot matching the Sprint 1 requirements.
+    """
+    timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+
+    # 1. Price feed (synchronous, on-demand)
+    candles_1m = price_feed.get_latest_candles(timeframe=price_feed.mt5.TIMEFRAME_M1 if price_feed.mt5 else None, count=60)
+    candles_15m = price_feed.get_latest_candles(timeframe=price_feed.mt5.TIMEFRAME_M15 if price_feed.mt5 else None, count=200)
+
+    price_status = "OK"
+    if candles_1m is None or candles_15m is None:
+        price_status = "ERROR"
+        logger.error("Data Manager: Price feed failed during snapshot.")
+
+    latest_candle = {}
+    if candles_1m:
+        latest_candle = candles_1m[-1]
+
+    # 2. Background feeds (from memory)
+    news_status = "OK" if _latest_news else "ERROR"
+    dxy_status = "OK" if _latest_dxy and _latest_dxy.get("price") else "ERROR"
+    # Calendar doesn't strictly have an error vs empty distinction in memory
+    # but we can assume if it's empty it might be fine, but let's just evaluate overall status
+    
+    # 3. Overall status
+    if price_status == "ERROR":
+        status = "ERROR"
+    elif not _latest_news or not _latest_dxy.get("price"):
+        status = "DEGRADED"
+    else:
+        status = "OK"
+
+    # 4. Assemble
+    return {
+        "timestamp": timestamp,
+        "price": {
+            "latest_candle": latest_candle,
+            "candles_1m": candles_1m or [],
+            "candles_15m": candles_15m or [],
+        },
+        "news": _latest_news,
+        "dxy": _latest_dxy,
+        "calendar": {
+            "events_today": _todays_events,
+            "high_impact_window": calendar_feed.is_high_impact_window(_todays_events),
+        },
+        "status": status,
+    }
