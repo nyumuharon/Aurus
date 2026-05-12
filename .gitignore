@@ -18,5 +18,6 @@ dist/
 *.egg-info/
 
 # Local historical market data caches
-data/raw/
-data/processed/
+data/
+logs/
+saved_models/
