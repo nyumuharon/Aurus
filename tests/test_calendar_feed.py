@@ -239,3 +239,38 @@ class TestGetNextEvent:
         }]
         result = calendar_feed.get_next_event(events=events)
         assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Test 7 — Graceful empty list when API is down
+# ---------------------------------------------------------------------------
+
+class TestApiDown:
+    """Test 7: Functions return safe fallbacks when API is down."""
+
+    def test_returns_empty_list_when_api_raises(self):
+        """Test 7a: get_todays_events() returns [] when requests.get raises."""
+        with patch(
+            "src.data.calendar_feed.requests.get",
+            side_effect=Exception("Connection refused"),
+        ):
+            result = calendar_feed.get_todays_events()
+        assert result == []
+
+    def test_is_high_impact_window_false_when_api_down(self):
+        """Test 7b: is_high_impact_window() returns False (safe) when API is down."""
+        with patch(
+            "src.data.calendar_feed.requests.get",
+            side_effect=Exception("Connection refused"),
+        ):
+            result = calendar_feed.is_high_impact_window()
+        assert result is False
+
+    def test_get_next_event_none_when_api_down(self):
+        """Test 7c: get_next_event() returns None when API is down."""
+        with patch(
+            "src.data.calendar_feed.requests.get",
+            side_effect=Exception("Connection refused"),
+        ):
+            result = calendar_feed.get_next_event()
+        assert result is None
