@@ -89,3 +89,37 @@ def _fetch_raw_events():
 
     logger.error("All calendar API retries failed.")
     return None
+
+
+def _to_standard_event(raw: dict):
+    """Convert a raw FF event dict to the Aurus standard format.
+
+    Applies currency and impact filters. Returns None if the event does
+    not pass both filters (currency in USD/XAU AND impact in High/Medium).
+
+    Args:
+        raw: Single raw event dict from the Forex Factory feed.
+
+    Returns:
+        dict with keys (timestamp, event, impact, currency), or None.
+    """
+    currency = (raw.get("country") or raw.get("currency") or "").upper().strip()
+    impact_raw = (raw.get("impact") or "").strip()
+    impact = impact_raw[0].upper() + impact_raw[1:].lower() if impact_raw else ""
+
+    if currency not in _VALID_CURRENCIES:
+        return None
+    if impact not in _VALID_IMPACTS:
+        return None
+
+    raw_dt = raw.get("date") or raw.get("datetime") or ""
+    dt = _parse_datetime(raw_dt)
+    if dt is None:
+        return None
+
+    return {
+        "timestamp": dt.strftime("%Y-%m-%d %H:%M:%S"),
+        "event": raw.get("title") or raw.get("name") or "Unknown",
+        "impact": impact.upper(),      # store as HIGH | MEDIUM
+        "currency": currency,
+    }
