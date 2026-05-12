@@ -166,3 +166,48 @@ def get_todays_events() -> list:
 
     logger.info("Calendar: %d high/medium USD/XAU events today.", len(result))
     return result
+
+
+def is_high_impact_window(events: list = None) -> bool:
+    """Check whether current UTC time is within 15 minutes of a HIGH event.
+
+    Fetches today's events if none are provided. Returns False (safe) if
+    event data is unavailable — never blocks the trading system.
+
+    Args:
+        events: Optional pre-fetched event list. Fetches fresh if None.
+
+    Returns:
+        True  — within ±15 minutes of a HIGH impact event.
+        False — outside window, no events, or data unavailable.
+    """
+    try:
+        if events is None:
+            events = get_todays_events()
+        if not events:
+            return False
+
+        now = datetime.now(tz=timezone.utc)
+        window = timedelta(minutes=_HIGH_IMPACT_WINDOW_MINUTES)
+
+        for event in events:
+            if event.get("impact") != "HIGH":
+                continue
+            try:
+                event_dt = datetime.strptime(
+                    event["timestamp"], "%Y-%m-%d %H:%M:%S"
+                ).replace(tzinfo=timezone.utc)
+            except ValueError:
+                continue
+            if abs(now - event_dt) <= window:
+                logger.warning(
+                    "HIGH impact window active: '%s' at %s",
+                    event["event"], event["timestamp"],
+                )
+                return True
+
+        return False
+
+    except Exception as exc:
+        logger.error("is_high_impact_window() error — defaulting to False: %s", exc)
+        return False
