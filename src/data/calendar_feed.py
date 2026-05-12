@@ -123,3 +123,46 @@ def _to_standard_event(raw: dict):
         "impact": impact.upper(),      # store as HIGH | MEDIUM
         "currency": currency,
     }
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+def get_todays_events() -> list:
+    """Fetch all high and medium impact USD/XAU economic events for today.
+
+    Contacts the Forex Factory calendar API, filters to today's UTC date,
+    and removes LOW impact and non-USD/XAU currency events.
+
+    Returns:
+        list[dict] — events with keys: timestamp, event, impact, currency.
+        []         — no matching events, API returned zero data, or API down.
+    """
+    raw_events = _fetch_raw_events()
+    if raw_events is None:
+        logger.warning("Calendar API unavailable — returning empty event list.")
+        return []
+
+    if not raw_events:
+        logger.warning("Calendar API returned zero events.")
+        return []
+
+    today_utc = datetime.now(tz=timezone.utc).date()
+    result = []
+
+    for raw in raw_events:
+        event = _to_standard_event(raw)
+        if event is None:
+            continue
+        try:
+            event_date = datetime.strptime(
+                event["timestamp"], "%Y-%m-%d %H:%M:%S"
+            ).date()
+        except ValueError:
+            continue
+        if event_date == today_utc:
+            result.append(event)
+
+    logger.info("Calendar: %d high/medium USD/XAU events today.", len(result))
+    return result
