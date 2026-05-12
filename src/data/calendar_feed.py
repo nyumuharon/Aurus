@@ -63,3 +63,29 @@ def _parse_datetime(raw: str):
     except (ValueError, TypeError) as exc:
         logger.warning("Failed to parse datetime '%s': %s", raw, exc)
         return None
+
+
+def _fetch_raw_events():
+    """Fetch the raw event list from the Forex Factory calendar API.
+
+    Retries once after _RETRY_DELAY seconds on any request failure.
+
+    Returns:
+        list[dict] — raw event dicts from the API.
+        None       — request failed after both attempts.
+    """
+    for attempt in range(1, 3):
+        try:
+            response = requests.get(_CALENDAR_URL, timeout=_REQUEST_TIMEOUT)
+            response.raise_for_status()
+            return response.json()
+        except Exception as exc:
+            logger.error(
+                "Calendar API request failed (attempt %d/2): %s", attempt, exc
+            )
+            if attempt == 1:
+                logger.info("Retrying calendar API in %d seconds…", _RETRY_DELAY)
+                time.sleep(_RETRY_DELAY)
+
+    logger.error("All calendar API retries failed.")
+    return None
