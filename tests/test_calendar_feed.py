@@ -153,3 +153,46 @@ class TestCurrencyFilter:
             assert event["currency"] in {"USD", "XAU"}, (
                 f"Unexpected currency: {event['currency']}"
             )
+
+
+# ---------------------------------------------------------------------------
+# Test 5 — is_high_impact_window() returns a boolean
+# ---------------------------------------------------------------------------
+
+class TestIsHighImpactWindow:
+    """Test 5: is_high_impact_window() returns a boolean."""
+
+    def test_returns_bool(self):
+        """Test 5a: is_high_impact_window() must return True or False."""
+        with patch("src.data.calendar_feed.requests.get", _mock_get(_make_raw_events())):
+            result = calendar_feed.is_high_impact_window()
+        assert isinstance(result, bool)
+
+    def test_returns_true_when_within_window(self):
+        """Test 5b: Returns True when current time is within 15 min of HIGH event."""
+        now = datetime.now(tz=timezone.utc)
+        event_dt = now + timedelta(minutes=5)
+        events = [{
+            "timestamp": event_dt.strftime("%Y-%m-%d %H:%M:%S"),
+            "event": "Test HIGH Event",
+            "impact": "HIGH",
+            "currency": "USD",
+        }]
+        result = calendar_feed.is_high_impact_window(events=events)
+        assert result is True
+
+    def test_returns_false_when_no_high_events(self):
+        """Test 5c: Returns False when all events are MEDIUM impact."""
+        events = [{
+            "timestamp": "2026-01-01 14:30:00",
+            "event": "Medium Event",
+            "impact": "MEDIUM",
+            "currency": "USD",
+        }]
+        result = calendar_feed.is_high_impact_window(events=events)
+        assert result is False
+
+    def test_returns_false_when_events_empty(self):
+        """Test 5d: Returns False when event list is empty."""
+        result = calendar_feed.is_high_impact_window(events=[])
+        assert result is False
