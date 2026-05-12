@@ -80,3 +80,23 @@ def _mock_get(raw_events: list):
     mock_response.json.return_value = raw_events
     mock_response.raise_for_status.return_value = None
     return MagicMock(return_value=mock_response)
+
+
+# ---------------------------------------------------------------------------
+# Test 1 — get_todays_events() returns a list
+# ---------------------------------------------------------------------------
+
+class TestGetTodaysEvents:
+    """Test 1: get_todays_events() returns a list (empty or populated)."""
+
+    def test_returns_list(self):
+        """Test 1a: get_todays_events() must always return a list."""
+        with patch("src.data.calendar_feed.requests.get", _mock_get(_make_raw_events())):
+            result = calendar_feed.get_todays_events()
+        assert isinstance(result, list)
+
+    def test_returns_non_empty_list_when_events_exist(self):
+        """Test 1b: Returns a populated list when matching events are available."""
+        with patch("src.data.calendar_feed.requests.get", _mock_get(_make_raw_events())):
+            result = calendar_feed.get_todays_events()
+        assert len(result) > 0
