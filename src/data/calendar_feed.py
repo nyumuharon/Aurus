@@ -37,3 +37,29 @@ _RETRY_DELAY = 5            # seconds — single retry on failure
 _VALID_CURRENCIES = {"USD", "XAU"}
 _VALID_IMPACTS = {"High", "Medium"}        # Forex Factory uses Title-case
 _HIGH_IMPACT_WINDOW_MINUTES = 15           # ±15 min around a HIGH event
+
+
+# ---------------------------------------------------------------------------
+# Private helpers
+# ---------------------------------------------------------------------------
+
+def _parse_datetime(raw: str):
+    """Parse a Forex Factory ISO-8601 datetime string into a UTC datetime.
+
+    Forex Factory returns timestamps like ``2026-03-01T14:30:00-05:00``
+    (US/Eastern). We convert to UTC for consistent time comparisons.
+
+    Args:
+        raw: ISO-8601 datetime string from the Forex Factory feed.
+
+    Returns:
+        datetime (UTC, timezone-aware) or None if parsing fails.
+    """
+    try:
+        dt = datetime.fromisoformat(raw)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except (ValueError, TypeError) as exc:
+        logger.warning("Failed to parse datetime '%s': %s", raw, exc)
+        return None
