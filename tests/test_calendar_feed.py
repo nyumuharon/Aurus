@@ -196,3 +196,46 @@ class TestIsHighImpactWindow:
         """Test 5d: Returns False when event list is empty."""
         result = calendar_feed.is_high_impact_window(events=[])
         assert result is False
+
+
+# ---------------------------------------------------------------------------
+# Test 6 — get_next_event() returns a dict or None
+# ---------------------------------------------------------------------------
+
+class TestGetNextEvent:
+    """Test 6: get_next_event() returns a dict or None."""
+
+    def test_returns_dict_or_none(self):
+        """Test 6a: get_next_event() must return a dict or None."""
+        with patch("src.data.calendar_feed.requests.get", _mock_get(_make_raw_events())):
+            result = calendar_feed.get_next_event()
+        assert result is None or isinstance(result, dict)
+
+    def test_returns_none_when_events_empty(self):
+        """Test 6b: get_next_event() returns None when event list is empty."""
+        result = calendar_feed.get_next_event(events=[])
+        assert result is None
+
+    def test_returns_soonest_future_event(self):
+        """Test 6c: get_next_event() returns the earliest future event."""
+        now = datetime.now(tz=timezone.utc)
+        soon = (now + timedelta(minutes=30)).strftime("%Y-%m-%d %H:%M:%S")
+        later = (now + timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S")
+        events = [
+            {"timestamp": later, "event": "Later Event", "impact": "HIGH", "currency": "USD"},
+            {"timestamp": soon, "event": "Soon Event", "impact": "MEDIUM", "currency": "USD"},
+        ]
+        result = calendar_feed.get_next_event(events=events)
+        assert result is not None
+        assert result["event"] == "Soon Event"
+
+    def test_returns_none_when_all_events_past(self):
+        """Test 6d: get_next_event() returns None when all events are in the past."""
+        events = [{
+            "timestamp": "2020-01-01 10:00:00",
+            "event": "Old Event",
+            "impact": "HIGH",
+            "currency": "USD",
+        }]
+        result = calendar_feed.get_next_event(events=events)
+        assert result is None
