@@ -121,3 +121,19 @@ def start() -> bool:
 
     logger.info("Data Manager: started successfully.")
     return True
+
+
+def stop() -> None:
+    """Cleanly shut down all connections and the background scheduler."""
+    global _is_running, _scheduler_thread
+
+    if not _is_running:
+        return
+
+    logger.info("Data Manager: stopping...")
+    _is_running = False
+    if _scheduler_thread and _scheduler_thread.is_alive():
+        _scheduler_thread.join(timeout=2.0)
+
+    price_feed.disconnect()
+    logger.info("Data Manager: stopped successfully.")
