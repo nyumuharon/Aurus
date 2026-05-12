@@ -23,3 +23,60 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 import src.data.calendar_feed as calendar_feed
+
+
+# ---------------------------------------------------------------------------
+# Shared mock fixtures
+# ---------------------------------------------------------------------------
+
+def _today_utc_iso(hour: int = 14, minute: int = 30) -> str:
+    """Return an ISO-8601 timestamp string for today at hour:minute UTC."""
+    today = datetime.now(tz=timezone.utc).date()
+    return f"{today}T{hour:02d}:{minute:02d}:00+00:00"
+
+
+def _make_raw_events(include_low: bool = False, include_eur: bool = False) -> list:
+    """Build a list of raw Forex Factory-style event dicts for today."""
+    events = [
+        {
+            "date": _today_utc_iso(14, 30),
+            "country": "USD",
+            "title": "US Non-Farm Payrolls",
+            "impact": "High",
+        },
+        {
+            "date": _today_utc_iso(15, 0),
+            "country": "USD",
+            "title": "Fed Interest Rate Decision",
+            "impact": "High",
+        },
+        {
+            "date": _today_utc_iso(16, 0),
+            "country": "USD",
+            "title": "ISM Manufacturing PMI",
+            "impact": "Medium",
+        },
+    ]
+    if include_low:
+        events.append({
+            "date": _today_utc_iso(17, 0),
+            "country": "USD",
+            "title": "Some Low Impact Event",
+            "impact": "Low",
+        })
+    if include_eur:
+        events.append({
+            "date": _today_utc_iso(10, 0),
+            "country": "EUR",
+            "title": "ECB Rate Decision",
+            "impact": "High",
+        })
+    return events
+
+
+def _mock_get(raw_events: list):
+    """Return a mock for requests.get that returns raw_events as JSON."""
+    mock_response = MagicMock()
+    mock_response.json.return_value = raw_events
+    mock_response.raise_for_status.return_value = None
+    return MagicMock(return_value=mock_response)
