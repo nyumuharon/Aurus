@@ -117,3 +117,21 @@ class TestEventKeys:
         for event in result:
             missing = required - event.keys()
             assert not missing, f"Event missing keys: {missing}"
+
+
+# ---------------------------------------------------------------------------
+# Test 3 — No LOW impact events appear in results
+# ---------------------------------------------------------------------------
+
+class TestNoLowImpact:
+    """Test 3: No LOW impact events appear in results."""
+
+    def test_low_impact_events_are_excluded(self):
+        """Test 3: Results must contain only HIGH or MEDIUM impact events."""
+        raw = _make_raw_events(include_low=True)
+        with patch("src.data.calendar_feed.requests.get", _mock_get(raw)):
+            result = calendar_feed.get_todays_events()
+        for event in result:
+            assert event["impact"] in {"HIGH", "MEDIUM"}, (
+                f"LOW impact event leaked through: {event}"
+            )
