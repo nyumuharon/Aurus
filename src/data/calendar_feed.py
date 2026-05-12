@@ -211,3 +211,46 @@ def is_high_impact_window(events: list = None) -> bool:
     except Exception as exc:
         logger.error("is_high_impact_window() error — defaulting to False: %s", exc)
         return False
+
+
+def get_next_event(events: list = None):
+    """Return the next upcoming economic event after the current UTC time.
+
+    Searches today's filtered event list for the earliest event that has
+    not yet occurred. Returns None if no future events exist.
+
+    Args:
+        events: Optional pre-fetched event list. Fetches fresh if None.
+
+    Returns:
+        dict — next upcoming event in standard format, or None.
+    """
+    try:
+        if events is None:
+            events = get_todays_events()
+        if not events:
+            return None
+
+        now = datetime.now(tz=timezone.utc)
+        upcoming = []
+
+        for event in events:
+            try:
+                event_dt = datetime.strptime(
+                    event["timestamp"], "%Y-%m-%d %H:%M:%S"
+                ).replace(tzinfo=timezone.utc)
+            except ValueError:
+                continue
+            if event_dt > now:
+                upcoming.append((event_dt, event))
+
+        if not upcoming:
+            logger.info("No upcoming events found for today.")
+            return None
+
+        upcoming.sort(key=lambda x: x[0])
+        return upcoming[0][1]
+
+    except Exception as exc:
+        logger.error("get_next_event() error: %s", exc)
+        return None
