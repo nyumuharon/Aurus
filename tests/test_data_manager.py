@@ -85,3 +85,76 @@ class TestLifecycle:
             data_manager.stop()
             assert data_manager.is_ready() is False
 
+
+# ---------------------------------------------------------------------------
+# Tests 3, 4, 5, 6 — Market Snapshot
+# ---------------------------------------------------------------------------
+
+@patch("src.data.data_manager.price_feed.get_latest_candles")
+class TestGetMarketSnapshot:
+    """Tests 3, 4, 5, 6: get_market_snapshot() structure and logic."""
+
+    @pytest.fixture(autouse=True)
+    def setup_state(self):
+        """Mock the internal state of data manager before each test."""
+        data_manager._latest_news = [{"headline": "Test News"}]
+        data_manager._latest_dxy = {"timestamp": "2026", "price": 100.0, "trend": "BULLISH"}
+        data_manager._todays_events = [{"event": "Test Event"}]
+        with patch("src.data.calendar_feed.is_high_impact_window", return_value=False):
+            yield
+
+    def _mock_candles(self, *args, **kwargs):
+        return [
+            {
+                "symbol": "XAUUSD",
+                "timestamp": "2026-03-01 10:00:00",
+                "open": 2000.0,
+                "high": 2005.0,
+                "low": 1995.0,
+                "close": 2002.0,
+                "volume": 100,
+            }
+        ]
+
+    def test_returns_dict(self, mock_get_candles):
+        """Test 3: get_market_snapshot() returns a dict."""
+        mock_get_candles.side_effect = self._mock_candles
+        result = data_manager.get_market_snapshot()
+        assert isinstance(result, dict)
+
+    def test_contains_required_keys(self, mock_get_candles):
+        """Test 4: Snapshot contains price, news, dxy, calendar, status keys."""
+        mock_get_candles.side_effect = self._mock_candles
+        result = data_manager.get_market_snapshot()
+        
+        required = {"timestamp", "price", "news", "dxy", "calendar", "status"}
+        for key in required:
+            assert key in result
+
+    def test_status_values(self, mock_get_candles):
+        """Test 5: status is one of OK, DEGRADED, or ERROR."""
+        # 1. OK status
+        mock_get_candles.side_effect = self._mock_candles
+        result = data_manager.get_market_snapshot()
+        assert result["status"] == "OK"
+
+        # 2. DEGRADED status (news missing)
+        data_manager._latest_news = []
+        result = data_manager.get_market_snapshot()
+        assert result["status"] == "DEGRADED"
+        
+        # 3. ERROR status (price feed fails)
+        mock_get_candles.side_effect = lambda *a, **kw: None
+        result = data_manager.get_market_snapshot()
+        assert result["status"] == "ERROR"
+
+    def test_latest_candle_contains_keys(self, mock_get_candles):
+        """Test 6: price.latest_candle contains all required OHLCV keys."""
+        mock_get_candles.side_effect = self._mock_candles
+        result = data_manager.get_market_snapshot()
+        
+        latest = result["price"]["latest_candle"]
+        required = {"symbol", "timestamp", "open", "high", "low", "close", "volume"}
+        for key in required:
+            assert key in latest
+
