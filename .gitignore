@@ -21,3 +21,4 @@ dist/
 data/
 logs/
 saved_models/
+.venv/
