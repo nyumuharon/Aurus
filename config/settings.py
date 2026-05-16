@@ -74,3 +74,20 @@ ENSEMBLE_THRESHOLD = 0.60    # minimum confidence to generate signal
 TRAIN_SPLIT = 0.70
 VALIDATION_SPLIT = 0.15
 TEST_SPLIT = 0.15
+
+# -- Sprint 3 - AI Validator ------------------------------------------
+
+# Ollama connection
+OLLAMA_HOST = "http://localhost:11434"
+OLLAMA_MODEL = "qwen3:8b"
+OLLAMA_TIMEOUT_SECONDS = 120
+OLLAMA_MAX_RETRIES = 1
+
+# Validator behaviour
+VALIDATOR_DEFAULT_DECISION = "NO"       # always NO on failure
+VALIDATOR_LOG_FILE = "logs/validator.log"
+VALIDATOR_MIN_CONFIDENCE = 0.60         # minimum ensemble score to validate
+
+# Prompt settings
+PROMPT_MAX_HEADLINES = 3                # max news headlines in prompt
+PROMPT_CALENDAR_WINDOW_HOURS = 4        # look ahead window for events

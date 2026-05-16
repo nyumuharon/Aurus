@@ -12,3 +12,5 @@ joblib==1.4.0
 yfinance==0.2.40
 numpy==1.26.4
 matplotlib==3.8.4
+# -- Sprint 3 - AI Validator ------------------------------------------
+ollama==0.2.1
