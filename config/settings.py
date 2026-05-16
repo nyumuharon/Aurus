@@ -91,3 +91,28 @@ VALIDATOR_MIN_CONFIDENCE = 0.60         # minimum ensemble score to validate
 # Prompt settings
 PROMPT_MAX_HEADLINES = 3                # max news headlines in prompt
 PROMPT_CALENDAR_WINDOW_HOURS = 4        # look ahead window for events
+
+# -- Sprint 4 - Risk Manager ------------------------------------------
+
+# Capital protection rules (prop firm standard)
+MAX_DAILY_LOSS_PCT = 0.05        # 5% max daily loss
+MAX_TOTAL_DRAWDOWN_PCT = 0.10    # 10% max total drawdown
+MAX_TRADES_PER_DAY = 3           # maximum trades per calendar day
+RISK_PER_TRADE_PCT = 0.01        # 1% account risk per trade
+MIN_RISK_REWARD_RATIO = 2.0      # minimum 1:2 R/R
+
+# ATR position sizing
+ATR_PERIOD = 14                  # ATR calculation period
+ATR_SL_MULTIPLIER = 1.5          # stop loss = ATR * 1.5
+ATR_TP_MULTIPLIER = 3.0          # take profit = ATR * 3.0 (1:2 R/R)
+
+# XAU/USD pip value
+XAUUSD_PIP_VALUE = 1.0           # $1 per 0.01 lot per pip on XAU/USD
+XAUUSD_LOT_STEP = 0.01           # minimum lot increment
+
+# Risk database
+RISK_DB_PATH = "data/risk.db"
+RISK_LOG_FILE = "logs/risk.log"
+
+# Account (set real value before live trading)
+ACCOUNT_BALANCE = 10000.0        # default demo account balance
