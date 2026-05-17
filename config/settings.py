@@ -116,3 +116,36 @@ RISK_LOG_FILE = "logs/risk.log"
 
 # Account (set real value before live trading)
 ACCOUNT_BALANCE = 10000.0        # default demo account balance
+
+# -- Sprint 5 - Execution Engine --------------------------------------
+
+# MT5 connection
+# MT5_LOGIN, MT5_PASSWORD, MT5_SERVER already defined at top of file
+MT5_TIMEOUT_MS = 10000               # connection timeout in milliseconds
+
+# Trading symbol
+# SYMBOL already defined at top of file
+SYMBOL_DEVIATION = 20                # max price deviation in points
+SYMBOL_MAGIC = 20260301              # unique identifier for Aurus orders
+
+# Order settings
+ORDER_TYPE_BUY = "BUY"
+ORDER_TYPE_SELL = "SELL"
+SLIPPAGE_POINTS = 20                 # max allowed slippage
+
+# Position monitoring
+MONITOR_INTERVAL_SECONDS = 5        # check positions every 5 seconds
+PARTIAL_CLOSE_RR = 1.0              # partial close at 1:1 R/R
+PARTIAL_CLOSE_PCT = 0.50            # close 50% of position at 1:1
+
+# Trailing stop
+TRAILING_STOP_ENABLED = True
+TRAILING_STOP_ATR_MULTIPLIER = 1.0  # trail by 1x ATR
+
+# Execution database
+EXECUTION_DB_PATH = "data/execution.db"
+EXECUTION_LOG_FILE = "logs/execution.log"
+
+# Safety
+DEMO_MODE = True                    # ALWAYS True until manually changed
+MAX_OPEN_POSITIONS = 1              # only 1 position at a time
