@@ -149,3 +149,24 @@ EXECUTION_LOG_FILE = "logs/execution.log"
 # Safety
 DEMO_MODE = True                    # ALWAYS True until manually changed
 MAX_OPEN_POSITIONS = 1              # only 1 position at a time
+
+# -- Sprint 6 - Monitoring --------------------------------------------
+
+# Trade journal
+JOURNAL_DB_PATH = "data/journal.db"
+JOURNAL_CSV_PATH = "data/trade_history.csv"
+
+# Telegram
+TELEGRAM_BOT_TOKEN = ""              # set before live trading
+TELEGRAM_CHAT_ID = ""               # set before live trading
+TELEGRAM_ENABLED = False             # set True when credentials added
+
+# Dashboard
+DASHBOARD_HOST = "127.0.0.1"
+DASHBOARD_PORT = 5000
+DASHBOARD_DEBUG = False
+
+# System
+SYSTEM_LOG_FILE = "logs/aurus.log"
+MAIN_LOOP_INTERVAL_SECONDS = 60     # check for new signals every 60 seconds
+SYSTEM_NAME = "Aurus v1.0"
